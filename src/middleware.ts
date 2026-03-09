@@ -3,12 +3,6 @@ import { verifyToken } from './lib/auth';
 
 /**
  * Middleware de Astro
- *
- * NOTA: Sistema de imágenes 100% Cloudflare R2
- * ===============================================
- * Este sistema utiliza Cloudflare R2 para almacenamiento de imágenes.
- * No se sirven archivos desde el sistema de archivos local.
- * Todas las imágenes se acceden directamente desde URLs públicas de R2.
  */
 
 export const onRequest = defineMiddleware(async (context, next) => {

@@ -3,8 +3,6 @@ import { db } from '../../../../lib/database';
 import { requireAuth } from '../../../../lib/auth';
 import { hashPassword } from '../../../../lib/auth';
 import { MigrationService } from '../../../../lib/migration-service';
-import { ImageUploadService, ImageType } from '../../../../lib/image-upload-service';
-import { R2StorageService } from '../../../../lib/r2-storage-service';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -31,9 +29,6 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const professional_license = formData.get('professional_license') as string;
     const password = formData.get('password') as string;
     const is_active = formData.get('is_active') === '1';
-    const signatureFile = formData.get('signature') as File | null;
-    const existingSignaturePath = formData.get('existing_signature_path') as string;
-    const removeSignature = formData.get('remove_signature') === '1';
 
     // Validaciones
     if (!id || !name || !email || !document_number) {
@@ -94,76 +89,6 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
 
-    // Procesar firma
-    let signaturePath: string | null = existingSignaturePath || null;
-
-    // Si se solicita eliminar la firma
-    if (removeSignature) {
-      if (existingSignaturePath && existingSignaturePath.startsWith('http')) {
-        try {
-          // Eliminar de R2
-          const urlObj = new URL(existingSignaturePath);
-          const key = urlObj.pathname.startsWith('/') ? urlObj.pathname.slice(1) : urlObj.pathname;
-          await R2StorageService.deleteFile(key);
-          console.log('🗑️ Firma eliminada de R2');
-        } catch (error) {
-          console.error('⚠️ Error eliminando firma:', error);
-        }
-      }
-      signaturePath = null;
-    }
-    // Si se subió una nueva firma
-    else if (signatureFile && signatureFile.size > 0) {
-      console.log('📝 Procesando nueva firma del médico...');
-
-      try {
-        // Convertir File a Buffer
-        const arrayBuffer = await signatureFile.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        let result;
-
-        // Si existe una firma anterior, usar reemplazo atómico
-        if (existingSignaturePath && existingSignaturePath.startsWith('http')) {
-          console.log('🔄 Reemplazando firma anterior...');
-          result = await ImageUploadService.replaceImage(
-            existingSignaturePath,
-            buffer,
-            ImageType.DOCTOR_SIGNATURE,
-            id
-          );
-        } else {
-          // No hay firma anterior, subir nueva
-          console.log('☁️ Subiendo nueva firma...');
-          result = await ImageUploadService.uploadDoctorSignature(buffer, id);
-        }
-
-        if (!result.success) {
-          console.error(`❌ Error subiendo firma: ${result.error}`);
-          return new Response(JSON.stringify({
-            success: false,
-            message: result.error || 'Error al subir la firma',
-            errorType: result.errorType
-          }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-
-        signaturePath = result.url;
-        console.log('✅ Firma procesada exitosamente:', signaturePath);
-      } catch (error) {
-        console.error('❌ Error procesando firma:', error);
-        return new Response(JSON.stringify({
-          success: false,
-          message: 'Error al procesar la firma'
-        }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-    }
-
     // Preparar la actualización
     let updateQuery = `
       UPDATE users SET
@@ -173,8 +98,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         phone = ?,
         specialization = ?,
         professional_license = ?,
-        is_active = ?,
-        signature_path = ?
+        is_active = ?
     `;
     let updateParams = [
       name,
@@ -183,8 +107,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       phone || null,
       specialization || 'Medicina General',
       professional_license || null,
-      is_active ? 1 : 0,
-      signaturePath
+      is_active ? 1 : 0
     ];
 
     // Si se proporcionó una nueva contraseña, incluirla en la actualización

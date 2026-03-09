@@ -1,7 +1,5 @@
 ---
 import DashboardLayout from '@/components/layout/DashboardLayout.astro';
-import CameraCapture from '@/components/ui/CameraCapture.astro';
-import SignaturePad from '@/components/ui/SignaturePad.astro';
 import { requireAuth } from '@/lib/auth';
 
 // Verificar autenticación y rol de admin o staff
@@ -281,47 +279,6 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
             </div>
           </div>
 
-          <!-- Sección de foto del paciente -->
-          <div class="border-t pt-6">
-            <h4 class="text-sm font-medium text-gray-900 mb-4">Foto del Paciente</h4>
-
-            <div id="currentPhotoContainer" class="mb-4 hidden text-center">
-              <p class="text-xs text-gray-500 mb-2">Foto Actual:</p>
-              <img id="currentPhotoPreview" src="" alt="Foto actual" class="mx-auto h-32 w-32 rounded-full object-cover border-2 border-gray-200 shadow-sm" />
-            </div>
-
-            <div class="bg-gray-50 p-4 rounded-lg">
-              <CameraCapture className="w-full" />
-            </div>
-            <p class="text-xs text-gray-500 mt-2">
-              📸 La foto será útil para identificar al paciente durante las consultas médicas. Formato recomendado: AVIF para mejor calidad y menor tamaño.
-            </p>
-            <p class="text-xs text-orange-600 mt-1 font-medium">
-              ⚠️ IMPORTANTE: Después de capturar la foto, debe hacer clic en "Confirmar Foto" para que se guarde correctamente.
-            </p>
-          </div>
-
-          <!-- Sección de firma del paciente -->
-          <div class="border-t pt-6 mt-6">
-            <h4 class="text-sm font-medium text-gray-900 mb-4">Firma del Paciente</h4>
-
-            <div id="currentSignatureContainer" class="mb-4 hidden text-center">
-              <p class="text-xs text-gray-500 mb-2">Firma Actual:</p>
-              <img id="currentSignaturePreview" src="" alt="Firma actual" class="mx-auto h-24 w-auto border-2 border-gray-200 shadow-sm rounded" style="max-width: 300px;" />
-              <p class="text-xs text-blue-600 mt-2">Si captura una nueva firma, reemplazará la actual</p>
-            </div>
-
-            <div class="bg-gray-50 p-4 rounded-lg">
-              <SignaturePad className="w-full" />
-            </div>
-            <p class="text-xs text-gray-500 mt-2">
-              ✍️ La firma del paciente será utilizada en los certificados médicos y documentos oficiales.
-            </p>
-            <p class="text-xs text-orange-600 mt-1 font-medium">
-              ⚠️ IMPORTANTE: Después de firmar, debe hacer clic en "Confirmar Firma" para que se guarde correctamente.
-            </p>
-          </div>
-          
           <div class="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 pt-4">
             <button type="button" id="cancelBtn" class="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm">
               Cancelar
@@ -341,73 +298,6 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
 </Layout>
 
 <script>
-  // 🚀 INICIALIZACIÓN CRÍTICA: Asignar callbacks INMEDIATAMENTE
-  // Variables globales para manejo de foto
-  let capturedPhotoBlob: Blob | null = null;
-  let capturedPhotoPath: string | null = null;
-
-  // Variables globales para manejo de firma
-  let capturedSignatureBlob: Blob | null = null;
-  let capturedSignaturePath: string | null = null;
-
-  // Función para manejar la foto capturada
-  (window as any).onPhotoCapture = async (photoBlob: Blob, photoUrl: string) => {
-    capturedPhotoBlob = photoBlob;
-
-    // Subir la foto inmediatamente para obtener la ruta
-    try {
-      const formData = new FormData();
-      formData.append('photo', photoBlob, 'patient-photo.' + (photoBlob.type === 'image/avif' ? 'avif' : 'webp'));
-      formData.append('patientId', 'temp_' + Date.now());
-
-      const response = await fetch('/api/admin/patients/upload-photo', {
-        method: 'POST',
-        body: formData
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        capturedPhotoPath = result.data.path;
-        showAlert('success', 'Foto Lista', 'La foto se ha preparado correctamente', 2000);
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (error) {
-      showAlert('error', 'Error', 'No se pudo procesar la foto capturada');
-    }
-  };
-
-  // Función para manejar la firma capturada
-  (window as any).onSignatureCapture = async (signatureBlob: Blob, signaturePath: string | null) => {
-    capturedSignatureBlob = signatureBlob;
-
-    // Subir la firma inmediatamente para obtener la ruta
-    try {
-      const formData = new FormData();
-      formData.append('signature', signatureBlob, 'patient-signature.png');
-      formData.append('patientId', 'temp_' + Date.now());
-
-      const response = await fetch('/api/admin/patients/upload-signature', {
-        method: 'POST',
-        body: formData
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        capturedSignaturePath = result.data.path;
-        showAlert('success', 'Firma Lista', 'La firma se ha preparado correctamente', 2000);
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (error) {
-      showAlert('error', 'Error', 'No se pudo procesar la firma capturada');
-    }
-  };
-
-
-
   // Comentarios de depuración limpiados
   let currentPatients: any[] = [];
   let currentPage = 1;
@@ -525,21 +415,9 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
         <td class="px-6 py-4 whitespace-nowrap">
           <div class="flex items-center">
             <div class="flex-shrink-0 h-10 w-10">
-              ${patient.photo_path ? `
-                <img 
-                  src="${patient.photo_path}" 
-                  alt="Foto de ${patient.name}"
-                  class="h-10 w-10 rounded-full object-cover border border-gray-200"
-                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'"
-                />
-                <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center border border-gray-200" style="display: none;">
-                  <span class="text-sm font-medium text-gray-700">${patient.name.charAt(0).toUpperCase()}</span>
-                </div>
-              ` : `
-                <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center border border-gray-200">
-                  <span class="text-sm font-medium text-gray-700">${patient.name.charAt(0).toUpperCase()}</span>
-                </div>
-              `}
+              <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center border border-gray-200">
+                <span class="text-sm font-medium text-gray-700">${patient.name.charAt(0).toUpperCase()}</span>
+              </div>
             </div>
             <div class="ml-4">
               <div class="text-sm font-medium text-gray-900">${patient.name}</div>
@@ -645,10 +523,6 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
     document.getElementById('modalTitle')!.textContent = 'Nuevo Paciente';
     document.getElementById('submitBtnText')!.textContent = 'Guardar Paciente';
 
-    // Limpiar estado de foto y firma
-    resetPhotoState();
-    resetSignatureState();
-
     // Cargar empresas para el selector
     loadCompaniesIntoSelect('');
     syncCompanyInputState();
@@ -656,43 +530,6 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
 
   function closeModal() {
     modal.classList.add('hidden');
-    // Limpiar estado de foto y firma al cerrar
-    resetPhotoState();
-    resetSignatureState();
-  }
-
-  // Función para limpiar el estado de la foto
-  function resetPhotoState() {
-    capturedPhotoBlob = null;
-    capturedPhotoPath = null;
-
-    // Limpiar preview de foto actual
-    const photoContainer = document.getElementById('currentPhotoContainer');
-    const photoPreview = document.getElementById('currentPhotoPreview') as HTMLImageElement;
-    if (photoContainer) photoContainer.classList.add('hidden');
-    if (photoPreview) photoPreview.src = '';
-
-    // Limpiar la cámara si existe
-    if ((window as any).cameraCapture) {
-      (window as any).cameraCapture.cleanup();
-    }
-  }
-
-  // Función para limpiar el estado de la firma
-  function resetSignatureState() {
-    capturedSignatureBlob = null;
-    capturedSignaturePath = null;
-
-    // Limpiar preview de firma actual
-    const signatureContainer = document.getElementById('currentSignatureContainer');
-    const signaturePreview = document.getElementById('currentSignaturePreview') as HTMLImageElement;
-    if (signatureContainer) signatureContainer.classList.add('hidden');
-    if (signaturePreview) signaturePreview.src = '';
-
-    // Limpiar el canvas de firma si existe
-    if ((window as any).signaturePad) {
-      (window as any).signaturePad.clearSignature();
-    }
   }
 
   // Cargar empresas en el selector de empresa
@@ -760,68 +597,13 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
     }, 300);
   });
 
-  // Variables movidas al inicio del script
-
-
-
-  // Función para subir la foto al servidor
-  async function uploadPhoto(photoBlob: Blob) {
-    try {
-      const formData = new FormData();
-      formData.append('photo', photoBlob, 'patient-photo.' + (photoBlob.type === 'image/avif' ? 'avif' : 'webp'));
-      formData.append('patientId', 'temp_' + Date.now());
-
-
-      
-      const response = await fetch('/api/admin/patients/upload-photo', {
-        method: 'POST',
-        body: formData
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        capturedPhotoPath = result.data.path;
-        showAlert('success', 'Foto Subida', 'La foto se ha preparado correctamente', 2000);
-      } else {
-        showAlert('error', 'Error al Subir Foto', result.message);
-      }
-    } catch (error) {
-      showAlert('error', 'Error de Conexión', 'No se pudo subir la foto');
-    }
-  }
-
   // Formulario de paciente
   patientForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    // Verificar si hay foto pendiente de subir
-    if (capturedPhotoBlob && !capturedPhotoPath) {
-      showAlert('info', 'Procesando...', 'Subiendo foto, por favor espere');
-      try {
-        await uploadPhoto(capturedPhotoBlob);
-        if (!capturedPhotoPath) {
-          throw new Error('No se pudo obtener la ruta de la foto');
-        }
-      } catch (error) {
-        showAlert('error', 'Error', 'Error al procesar la foto. Intente capturarla nuevamente.');
-        return;
-      }
-    }
-    
+
     const formData = new FormData(patientForm);
     const data = Object.fromEntries(formData.entries());
-
-    // Agregar la ruta de la foto si existe
-    if (capturedPhotoPath) {
-      (data as any).photoPath = capturedPhotoPath;
-    }
-
-    // Agregar la ruta de la firma si existe
-    if (capturedSignaturePath) {
-      (data as any).signaturePath = capturedSignaturePath;
-    }
 
     // Validación extra del documento
     const documentNumber = data.documentNumber as string;
@@ -944,10 +726,6 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
 
   (window as any).editPatient = async (id: number) => {
     try {
-      // Limpiar estado de foto y firma antes de abrir
-      resetPhotoState();
-      resetSignatureState();
-
       // Obtener datos del paciente
       const response = await fetch(`/api/admin/patients/${id}`);
       const result = await response.json();
@@ -983,34 +761,6 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
         (document.querySelector('textarea[name="allergies"]') as HTMLTextAreaElement).value = patient.allergies || '';
         (document.querySelector('textarea[name="medications"]') as HTMLTextAreaElement).value = patient.medications || '';
         (document.querySelector('textarea[name="medicalConditions"]') as HTMLTextAreaElement).value = patient.medical_conditions || '';
-
-        // Mostrar foto actual si existe
-        const photoContainer = document.getElementById('currentPhotoContainer');
-        const photoPreview = document.getElementById('currentPhotoPreview') as HTMLImageElement;
-
-        if (patient.photo_path) {
-          photoPreview.src = patient.photo_path;
-          photoContainer?.classList.remove('hidden');
-          // Guardar ruta de foto existente para enviarla si no se captura una nueva
-          capturedPhotoPath = patient.photo_path;
-        } else {
-          photoContainer?.classList.add('hidden');
-          photoPreview.src = '';
-        }
-
-        // Mostrar firma actual si existe
-        const signatureContainer = document.getElementById('currentSignatureContainer');
-        const signaturePreview = document.getElementById('currentSignaturePreview') as HTMLImageElement;
-
-        if (patient.signature_path) {
-          signaturePreview.src = patient.signature_path;
-          signatureContainer?.classList.remove('hidden');
-          // Guardar ruta de firma existente para enviarla si no se captura una nueva
-          capturedSignaturePath = patient.signature_path;
-        } else {
-          signatureContainer?.classList.add('hidden');
-          signaturePreview.src = '';
-        }
 
         // Cargar empresas y preseleccionar la del paciente si existe
         await loadCompaniesIntoSelect(patient.company_id ? String(patient.company_id) : '');

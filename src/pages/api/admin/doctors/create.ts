@@ -3,7 +3,6 @@ import { db } from '../../../../lib/database';
 import { requireAuth } from '../../../../lib/auth';
 import { hashPassword } from '../../../../lib/auth';
 import { MigrationService } from '../../../../lib/migration-service';
-import { ImageUploadService } from '../../../../lib/image-upload-service';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -32,7 +31,6 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const professional_license = formData.get('professional_license') as string;
     const password = formData.get('password') as string;
     const is_active = formData.get('is_active') === '1';
-    const signatureFile = formData.get('signature') as File | null;
 
     // Validaciones
     if (!name || !email || !document_number || !password) {
@@ -80,52 +78,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Hash de la contraseña
     const passwordHash = await hashPassword(password);
 
-    // Procesar firma si se subió
-    let signaturePath: string | null = null;
-    if (signatureFile && signatureFile.size > 0) {
-      console.log('📝 Procesando firma del médico...');
-
-      try {
-        // Convertir File a Buffer
-        const arrayBuffer = await signatureFile.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        // Usar ImageUploadService para validación, optimización y subida con reintentos
-        // Usamos document_number como ID temporal, se actualizará después con el ID real si es necesario
-        const result = await ImageUploadService.uploadDoctorSignature(buffer, document_number);
-
-        if (!result.success) {
-          console.error(`❌ Error subiendo firma: ${result.error}`);
-          return new Response(JSON.stringify({
-            success: false,
-            message: result.error || 'Error al subir la firma',
-            errorType: result.errorType
-          }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-
-        signaturePath = result.url;
-        console.log('✅ Firma guardada en R2:', signaturePath);
-      } catch (error) {
-        console.error('❌ Error procesando firma:', error);
-        return new Response(JSON.stringify({
-          success: false,
-          message: 'Error al procesar la firma'
-        }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-    }
-
     // Insertar nuevo doctor
     const [result] = await db.execute(
       `INSERT INTO users (
         name, email, password_hash, document_number, phone,
-        specialization, professional_license, role, is_active, signature_path
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'doctor', ?, ?)`,
+        specialization, professional_license, role, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'doctor', ?)`,
       [
         name,
         email,
@@ -134,8 +92,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         phone || null,
         specialization || 'Medicina General',
         professional_license || null,
-        is_active ? 1 : 0,
-        signaturePath
+        is_active ? 1 : 0
       ]
     );
 
