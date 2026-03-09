@@ -3,9 +3,8 @@ import { db } from '../../../../lib/database';
 import { requireAuth } from '../../../../lib/auth';
 import { hashPassword } from '../../../../lib/auth';
 import { MigrationService } from '../../../../lib/migration-service';
+import { ImageUploadService, ImageType } from '../../../../lib/image-upload-service';
 import { R2StorageService } from '../../../../lib/r2-storage-service';
-import fs from 'fs';
-import path from 'path';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -98,32 +97,18 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Procesar firma
     let signaturePath: string | null = existingSignaturePath || null;
 
-    // Función auxiliar para eliminar firma antigua
-    const deleteOldSignature = async (pathToDelete: string) => {
-      try {
-        if (pathToDelete.startsWith('http')) {
-          // Es URL de R2
-          console.log('🗑️ Intentando eliminar firma de R2:', pathToDelete);
-          const urlObj = new URL(pathToDelete);
-          const key = urlObj.pathname.startsWith('/') ? urlObj.pathname.slice(1) : urlObj.pathname;
-          await R2StorageService.deleteFile(key);
-        } else {
-          // Es archivo local
-          const oldFilePath = path.join(process.cwd(), 'public', pathToDelete);
-          if (fs.existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
-            console.log('🗑️ Firma local eliminada');
-          }
-        }
-      } catch (error) {
-        console.error('⚠️ Error eliminando firma antigua:', error);
-      }
-    };
-
     // Si se solicita eliminar la firma
     if (removeSignature) {
-      if (existingSignaturePath) {
-        await deleteOldSignature(existingSignaturePath);
+      if (existingSignaturePath && existingSignaturePath.startsWith('http')) {
+        try {
+          // Eliminar de R2
+          const urlObj = new URL(existingSignaturePath);
+          const key = urlObj.pathname.startsWith('/') ? urlObj.pathname.slice(1) : urlObj.pathname;
+          await R2StorageService.deleteFile(key);
+          console.log('🗑️ Firma eliminada de R2');
+        } catch (error) {
+          console.error('⚠️ Error eliminando firma:', error);
+        }
       }
       signaturePath = null;
     }
@@ -131,45 +116,47 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     else if (signatureFile && signatureFile.size > 0) {
       console.log('📝 Procesando nueva firma del médico...');
 
-      // Validar tamaño (2 MB máximo)
-      if (signatureFile.size > 2 * 1024 * 1024) {
-        return new Response(JSON.stringify({
-          success: false,
-          message: 'La imagen de firma no debe superar 2 MB'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-
-      // Eliminar firma anterior si existe
-      if (existingSignaturePath) {
-        await deleteOldSignature(existingSignaturePath);
-      }
-
-      // Generar nombre único para el archivo
-      const timestamp = Date.now();
-      const fileExtension = signatureFile.name.split('.').pop() || 'png';
-      const fileName = `signatures/doctor_${document_number}_${timestamp}.${fileExtension}`;
-      
       try {
         // Convertir File a Buffer
         const arrayBuffer = await signatureFile.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
-        
-        // Subir a R2
-        console.log('☁️ Subiendo nueva firma a R2...');
-        signaturePath = await R2StorageService.uploadFile(
-          buffer,
-          fileName,
-          signatureFile.type || 'image/png'
-        );
-        console.log('✅ Nueva firma guardada en R2:', signaturePath);
+
+        let result;
+
+        // Si existe una firma anterior, usar reemplazo atómico
+        if (existingSignaturePath && existingSignaturePath.startsWith('http')) {
+          console.log('🔄 Reemplazando firma anterior...');
+          result = await ImageUploadService.replaceImage(
+            existingSignaturePath,
+            buffer,
+            ImageType.DOCTOR_SIGNATURE,
+            id
+          );
+        } else {
+          // No hay firma anterior, subir nueva
+          console.log('☁️ Subiendo nueva firma...');
+          result = await ImageUploadService.uploadDoctorSignature(buffer, id);
+        }
+
+        if (!result.success) {
+          console.error(`❌ Error subiendo firma: ${result.error}`);
+          return new Response(JSON.stringify({
+            success: false,
+            message: result.error || 'Error al subir la firma',
+            errorType: result.errorType
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        signaturePath = result.url;
+        console.log('✅ Firma procesada exitosamente:', signaturePath);
       } catch (error) {
-        console.error('❌ Error subiendo nueva firma a R2:', error);
+        console.error('❌ Error procesando firma:', error);
         return new Response(JSON.stringify({
           success: false,
-          message: 'Error al subir la firma'
+          message: 'Error al procesar la firma'
         }), {
           status: 500,
           headers: { 'Content-Type': 'application/json' }

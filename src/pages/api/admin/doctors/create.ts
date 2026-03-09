@@ -3,9 +3,7 @@ import { db } from '../../../../lib/database';
 import { requireAuth } from '../../../../lib/auth';
 import { hashPassword } from '../../../../lib/auth';
 import { MigrationService } from '../../../../lib/migration-service';
-import { R2StorageService } from '../../../../lib/r2-storage-service';
-import fs from 'fs';
-import path from 'path';
+import { ImageUploadService } from '../../../../lib/image-upload-service';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -87,40 +85,34 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     if (signatureFile && signatureFile.size > 0) {
       console.log('📝 Procesando firma del médico...');
 
-      // Validar tamaño (2 MB máximo)
-      if (signatureFile.size > 2 * 1024 * 1024) {
-        return new Response(JSON.stringify({
-          success: false,
-          message: 'La imagen de firma no debe superar 2 MB'
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-
-      // Generar nombre único para el archivo
-      const timestamp = Date.now();
-      const fileExtension = signatureFile.name.split('.').pop() || 'png';
-      const fileName = `signatures/doctor_${document_number}_${timestamp}.${fileExtension}`;
-      
       try {
         // Convertir File a Buffer
         const arrayBuffer = await signatureFile.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
-        
-        // Subir a R2
-        console.log('☁️ Subiendo firma a R2...');
-        signaturePath = await R2StorageService.uploadFile(
-          buffer,
-          fileName,
-          signatureFile.type || 'image/png'
-        );
+
+        // Usar ImageUploadService para validación, optimización y subida con reintentos
+        // Usamos document_number como ID temporal, se actualizará después con el ID real si es necesario
+        const result = await ImageUploadService.uploadDoctorSignature(buffer, document_number);
+
+        if (!result.success) {
+          console.error(`❌ Error subiendo firma: ${result.error}`);
+          return new Response(JSON.stringify({
+            success: false,
+            message: result.error || 'Error al subir la firma',
+            errorType: result.errorType
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        signaturePath = result.url;
         console.log('✅ Firma guardada en R2:', signaturePath);
       } catch (error) {
-        console.error('❌ Error subiendo firma a R2:', error);
+        console.error('❌ Error procesando firma:', error);
         return new Response(JSON.stringify({
           success: false,
-          message: 'Error al subir la firma'
+          message: 'Error al procesar la firma'
         }), {
           status: 500,
           headers: { 'Content-Type': 'application/json' }

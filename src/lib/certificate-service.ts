@@ -1,10 +1,9 @@
 import { db } from './database.js';
 import { getBaseUrl } from './utils.js';
+import { CertificateImageCache } from './certificate-image-cache.js';
 import dayjs from 'dayjs';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
-import fs from 'fs';
-import path from 'path';
 import sharp from 'sharp';
 
 export type AptitudeStatus = 'apto' | 'apto_con_restricciones' | 'apto_manipulacion_alimentos' | 'apto_trabajo_alturas' | 'apto_espacios_confinados' | 'apto_conduccion';
@@ -40,84 +39,38 @@ function cleanText(text: string): string {
 
 export class CertificateService {
   /**
-   * Resolver ruta de archivo estático tanto en desarrollo como en producción
+   * Convertir imagen a formato compatible con PDFKit usando caché
+   * Ahora todas las imágenes son URLs de R2, no paths locales
    */
-  private static resolvePublicPath(relativePath: string): string {
-    // Si es una URL completa, retornarla tal cual
-    if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
-        return relativePath;
-    }
-
-    // Remover el slash inicial si existe
-    const cleanPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
-
-    // Buscar en múltiples ubicaciones:
-    // 1. uploads/ (carpeta persistente - RECOMENDADO para producción)
-    // 2. dist/client/ (archivos del build)
-    // 3. public/ (desarrollo)
-    const possiblePaths = [
-      path.join(process.cwd(), cleanPath),                    // uploads/ (persistente)
-      path.join(process.cwd(), 'dist', 'client', cleanPath),  // Producción (build)
-      path.join(process.cwd(), 'public', cleanPath),          // Desarrollo
-      path.join(process.cwd(), '..', cleanPath),              // Server en subdirectorio
-    ];
-
-    // Buscar el archivo en las rutas posibles
-    for (const possiblePath of possiblePaths) {
-      if (fs.existsSync(possiblePath)) {
-        console.log('✅ Archivo encontrado en:', possiblePath);
-        return possiblePath;
-      }
-    }
-
-    // Si no se encuentra, retornar la primera opción y dejar que falle
-    console.error('❌ Archivo no encontrado en ninguna ubicación:');
-    possiblePaths.forEach(p => console.error('   -', p));
-    return possiblePaths[0];
-  }
-
-  /**
-   * Convertir imagen a formato compatible con PDFKit
-   */
-  private static async convertImageForPDF(imagePath: string): Promise<Buffer | null> {
+  private static async convertImageForPDF(imageUrl: string): Promise<Buffer | null> {
     try {
-      console.log('📁 Intentando cargar imagen desde:', imagePath);
-      
-      let inputBuffer: Buffer;
+      if (!imageUrl) {
+        console.log('⚠️ No se proporcionó URL de imagen');
+        return null;
+      }
 
-      // Verificar si es una URL remota
-      if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-          console.log('🌐 Descargando imagen remota...');
-          const response = await fetch(imagePath);
-          if (!response.ok) {
-              console.error(`❌ Error descargando imagen: ${response.statusText}`);
-              return null;
-          }
-          const arrayBuffer = await response.arrayBuffer();
-          inputBuffer = Buffer.from(arrayBuffer);
-      } else {
-          // Verificar si el archivo local existe
-          if (!fs.existsSync(imagePath)) {
-            console.error('❌ El archivo no existe:', imagePath);
-            console.error('   process.cwd():', process.cwd());
-            return null;
-          }
-          inputBuffer = fs.readFileSync(imagePath);
+      console.log('📁 Cargando imagen desde R2:', imageUrl);
+
+      // Obtener imagen del caché (o descargar si no está cacheada)
+      let inputBuffer = await CertificateImageCache.getImage(imageUrl);
+
+      if (!inputBuffer) {
+        console.error('❌ No se pudo obtener imagen del caché');
+        return null;
       }
 
       // Procesar con Sharp para asegurar compatibilidad (convertir a JPEG)
-      // Incluso si es JPEG, lo procesamos para asegurar que no tenga problemas (ej. CMYK, etc.)
       console.log('🔄 Optimizando imagen para PDF...');
       const jpegBuffer = await sharp(inputBuffer)
-        .flatten({ background: { r: 255, g: 255, b: 255 } }) // Agregar fondo blanco para evitar fondo negro en transparencias
-        .jpeg({ quality: 80 }) // Calidad un poco menor para reducir tamaño del PDF
+        .flatten({ background: { r: 255, g: 255, b: 255 } }) // Agregar fondo blanco para transparencias
+        .jpeg({ quality: 80 }) // Calidad optimizada para PDF
         .toBuffer();
 
       console.log('✅ Imagen convertida exitosamente');
       return jpegBuffer;
     } catch (error) {
       console.error('❌ Error convirtiendo imagen:', error);
-      console.error('   Ruta intentada:', imagePath);
+      console.error('   URL intentada:', imageUrl);
       return null;
     }
   }
@@ -230,6 +183,13 @@ export class CertificateService {
 
       if (!doctor || doctor.role !== 'doctor') {
         return { success: false, message: 'Doctor no autorizado: solo médicos pueden emitir certificados' };
+      }
+
+      // Precargar imágenes en caché para generación rápida de PDF
+      console.log('🔄 Precargando imágenes en caché...');
+      const imageUrls = [patient.photo_path, patient.signature_path, doctor.signature_path].filter(Boolean);
+      if (imageUrls.length > 0) {
+        await CertificateImageCache.preloadImages(imageUrls);
       }
 
       // Generar código de verificación único
@@ -534,10 +494,8 @@ export class CertificateService {
       if (doctor.signature_path) {
         try {
           console.log('✍️ Doctor tiene firma digital configurada:', doctor.signature_path);
-          const signaturePath = this.resolvePublicPath(doctor.signature_path);
-          console.log('🔍 Ruta completa construida:', signaturePath);
 
-          const signBuffer = await this.convertImageForPDF(signaturePath);
+          const signBuffer = await this.convertImageForPDF(doctor.signature_path);
           if (signBuffer) {
             console.log('✅ Firma del médico cargada exitosamente, insertando en PDF');
             doc.image(signBuffer, 60, signatureY - 10, { width: 150, height: 40, align: 'left' });
@@ -575,8 +533,7 @@ export class CertificateService {
       // Si el paciente tiene firma digital, insertarla
       if (patient.signature_path) {
         try {
-          const patientSignaturePath = this.resolvePublicPath(patient.signature_path);
-          const patientSigBuffer = await this.convertImageForPDF(patientSignaturePath);
+          const patientSigBuffer = await this.convertImageForPDF(patient.signature_path);
           if (patientSigBuffer) {
             doc.image(patientSigBuffer, rightSigX, signatureY - 10, { width: 150, height: 40, align: 'left' });
             doc.text(cleanText(patient.name), rightSigX, signatureY + 35);
@@ -916,10 +873,8 @@ export class CertificateService {
       if (doctor?.signature_path) {
         try {
           console.log('✍️ [renderPDFFromRecord] Doctor tiene firma digital configurada:', doctor.signature_path);
-          const signaturePath = this.resolvePublicPath(doctor.signature_path);
-          console.log('🔍 [renderPDFFromRecord] Ruta completa construida:', signaturePath);
 
-          const signBuffer = await this.convertImageForPDF(signaturePath);
+          const signBuffer = await this.convertImageForPDF(doctor.signature_path);
           if (signBuffer) {
             console.log('✅ [renderPDFFromRecord] Firma del médico cargada exitosamente, insertando en PDF');
             doc.image(signBuffer, 60, signatureY - 10, { width: 150, height: 40, align: 'left' });
@@ -957,8 +912,7 @@ export class CertificateService {
       // Si el paciente tiene firma digital, insertarla
       if (patient?.signature_path) {
         try {
-          const patientSignaturePath = this.resolvePublicPath(patient.signature_path);
-          const patientSigBuffer = await this.convertImageForPDF(patientSignaturePath);
+          const patientSigBuffer = await this.convertImageForPDF(patient.signature_path);
           if (patientSigBuffer) {
             doc.image(patientSigBuffer, rightSigX, signatureY - 10, { width: 150, height: 40, align: 'left' });
             doc.text(cleanText(patient.name || ''), rightSigX, signatureY + 35);
