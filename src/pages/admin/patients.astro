@@ -1,5 +1,6 @@
 ---
 import DashboardLayout from '@/components/layout/DashboardLayout.astro';
+import SignaturePad from '@/components/ui/SignaturePad.astro';
 import { requireAuth } from '@/lib/auth';
 
 // Verificar autenticación y rol de admin o staff
@@ -298,10 +299,89 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
 </Layout>
 
 <script>
-  // Comentarios de depuración limpiados
-  let currentPatients: any[] = [];
+  import Swal from 'sweetalert2';
+  
+  // Declaración de tipos
+  interface Patient {
+    id: number;
+    name: string;
+    email: string;
+    documentType: string;
+    documentNumber: string;
+    dateOfBirth: string;
+    gender: string;
+    phone?: string;
+    bloodType?: string;
+    address?: string;
+    occupation?: string;
+    company?: string;
+    companyId?: number;
+    emergencyContactName?: string;
+    emergencyContactPhone?: string;
+    photoPath?: string;
+    signaturePath?: string;
+    allergies?: string;
+    medications?: string;
+    medicalConditions?: string;
+  }
+
+  let currentPatients: Patient[] = [];
+  let currentSignatureBlob: Blob | null = null;
+  let isEditMode = false;
+  let currentPatientId: number | null = null;
   let currentPage = 1;
   const itemsPerPage = 10;
+
+  // Elementos de firma
+  const existingSignatureContainer = document.getElementById('existingSignatureContainer')!;
+  const newSignatureContainer = document.getElementById('newSignatureContainer')!;
+  const existingSignatureImage = document.getElementById('existingSignatureImage') as HTMLImageElement;
+  const signaturePreviewContainer = document.getElementById('signaturePreviewContainer')!;
+  const changeSignatureBtn = document.getElementById('changeSignatureBtn')!;
+  const resetSignatureBtn = document.getElementById('resetSignatureBtn')!;
+
+  // Funciones de firma
+  function showExistingSignature(url: string) {
+    existingSignatureImage.src = url;
+    existingSignatureContainer.classList.remove('hidden');
+    newSignatureContainer.classList.add('hidden');
+    currentSignatureBlob = null;
+  }
+
+  function showNewSignaturePad() {
+    existingSignatureContainer.classList.add('hidden');
+    newSignatureContainer.classList.remove('hidden');
+    signaturePreviewContainer.classList.add('hidden');
+    
+    // Resize signature pad when visible
+    setTimeout(() => {
+      if ((window as any).signaturePad) {
+        (window as any).signaturePad.resize();
+        (window as any).signaturePad.clearSignature();
+      }
+    }, 100);
+  }
+
+  // Event listeners para firma
+  if (changeSignatureBtn) {
+    changeSignatureBtn.addEventListener('click', showNewSignaturePad);
+  }
+
+  if (resetSignatureBtn) {
+    resetSignatureBtn.addEventListener('click', () => {
+      signaturePreviewContainer.classList.add('hidden');
+      currentSignatureBlob = null;
+      if ((window as any).signaturePad) {
+        (window as any).signaturePad.clearSignature();
+      }
+    });
+  }
+
+  // Callback global para captura de firma
+  (window as any).onSignatureCapture = (blob: Blob, url: string) => {
+    currentSignatureBlob = blob;
+    signaturePreviewContainer.classList.remove('hidden');
+  };
 
   // Cargar estadísticas
   async function loadStatistics() {
@@ -526,6 +606,10 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
     // Cargar empresas para el selector
     loadCompaniesIntoSelect('');
     syncCompanyInputState();
+    
+    // Resetear firma
+    currentSignatureBlob = null;
+    showNewSignaturePad();
   }
 
   function closeModal() {
@@ -603,10 +687,14 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
     e.stopPropagation();
 
     const formData = new FormData(patientForm);
-    const data = Object.fromEntries(formData.entries());
+    
+    // Agregar firma si existe
+    if (currentSignatureBlob) {
+      formData.append('signature', currentSignatureBlob, 'signature.png');
+    }
 
     // Validación extra del documento
-    const documentNumber = data.documentNumber as string;
+    const documentNumber = formData.get('documentNumber') as string;
     if (!documentNumber || documentNumber.trim() === '') {
       showAlert('error', 'Error', 'El número de documento es requerido');
       return;
@@ -631,8 +719,7 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
 
       const response = await fetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: formData // Enviar como FormData para soportar archivos
       });
 
       const result = await response.json();
@@ -769,6 +856,16 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
           companySelectEl.value = patient.company_id ? String(patient.company_id) : '';
         }
         syncCompanyInputState();
+
+        // Gestionar firma
+        currentSignatureBlob = null;
+        if (patient.signature_path) {
+          // Si tiene firma, mostrarla
+          showExistingSignature(patient.signature_path);
+        } else {
+          // Si no tiene firma, mostrar el pad
+          showNewSignaturePad();
+        }
 
         // Cambiar el título del modal y agregar el ID del paciente
         document.getElementById('modalTitle')!.textContent = 'Editar Paciente';

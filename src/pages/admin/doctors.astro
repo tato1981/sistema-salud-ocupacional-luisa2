@@ -1,5 +1,6 @@
 ---
 import DashboardLayout from '../../components/layout/DashboardLayout.astro';
+import SignaturePad from '../../components/ui/SignaturePad.astro';
 import { requireAuth } from '../../lib/auth';
 
 // Verificar autenticación y rol de administrador
@@ -295,6 +296,90 @@ if (!user || user.role !== 'admin') {
               </div>
             </div>
 
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Firma Digital</label>
+              
+              <!-- Tabs para elegir método de firma -->
+              <div class="flex border-b border-gray-200 mb-4">
+                <button type="button" id="tabDrawSignature" class="px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600 focus:outline-none">
+                  Dibujar Firma
+                </button>
+                <button type="button" id="tabUploadSignature" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none">
+                  Subir Imagen
+                </button>
+              </div>
+
+              <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                
+                <!-- Firma existente -->
+                <div id="existingSignatureContainer" class="hidden mb-4 text-center">
+                  <p class="text-sm text-gray-500 mb-2">Firma Actual</p>
+                  <img id="existingSignatureImage" src="" alt="Firma del doctor" class="mx-auto max-h-32 border border-gray-300 rounded bg-white mb-3" />
+                  <button type="button" id="changeSignatureBtn" class="text-sm text-blue-600 hover:text-blue-800 font-medium underline">
+                    Cambiar Firma
+                  </button>
+                </div>
+
+                <!-- Contenedor para dibujar firma -->
+                <div id="drawSignatureContainer">
+                  <div id="newSignatureContainer">
+                    <SignaturePad />
+                    <div id="signaturePreviewContainer" class="hidden mt-3 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+                      <div class="flex items-center space-x-3">
+                        <div class="bg-green-100 p-2 rounded-full">
+                          <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                          </svg>
+                        </div>
+                        <div>
+                          <p class="text-sm font-medium text-green-800">Firma capturada correctamente</p>
+                          <p class="text-xs text-green-600">Lista para guardar</p>
+                        </div>
+                      </div>
+                      <button type="button" id="resetSignatureBtn" class="text-sm text-red-600 hover:text-red-800 font-medium">
+                        Cambiar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Contenedor para subir imagen -->
+                <div id="uploadSignatureContainer" class="hidden">
+                  <div class="flex flex-col items-center justify-center w-full">
+                    <label for="signatureFile" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                      <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                        <svg class="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                        </svg>
+                        <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Click para subir</span> o arrastrar y soltar</p>
+                        <p class="text-xs text-gray-500">PNG, JPG (MAX. 2MB)</p>
+                      </div>
+                      <input id="signatureFile" type="file" class="hidden" accept="image/png, image/jpeg, image/jpg" />
+                    </label>
+                  </div>
+                  
+                  <div id="uploadPreviewContainer" class="hidden mt-4 text-center relative">
+                    <p class="text-sm text-gray-500 mb-2">Vista previa</p>
+                    <div class="relative inline-block">
+                      <img id="uploadPreviewImage" src="" alt="Vista previa firma" class="max-h-32 border border-gray-300 rounded bg-white" />
+                      <button type="button" id="removeUploadBtn" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-md">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="mt-2 text-green-600 text-sm font-medium flex items-center justify-center gap-1">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                      Imagen seleccionada
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
             <div class="flex justify-end space-x-3 pt-4">
               <button 
                 type="button" 
@@ -327,12 +412,171 @@ if (!user || user.role !== 'admin') {
       professional_license?: string;
       is_active: boolean;
       patient_count?: number;
+      signature_path?: string;
     }
 
     let doctors: Doctor[] = [];
     let filteredDoctors: Doctor[] = [];
     let currentPage = 1;
     const itemsPerPage = 10;
+    let currentSignatureBlob: Blob | null = null;
+    let currentSignatureMode: 'draw' | 'upload' = 'draw';
+
+    // Cambiar modo de firma
+    function switchSignatureMode(mode: 'draw' | 'upload') {
+      currentSignatureMode = mode;
+      
+      const tabDraw = document.getElementById('tabDrawSignature');
+      const tabUpload = document.getElementById('tabUploadSignature');
+      const containerDraw = document.getElementById('drawSignatureContainer');
+      const containerUpload = document.getElementById('uploadSignatureContainer');
+      
+      if (mode === 'draw') {
+        tabDraw?.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+        tabDraw?.classList.remove('text-gray-500', 'hover:text-gray-700');
+        
+        tabUpload?.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+        tabUpload?.classList.add('text-gray-500', 'hover:text-gray-700');
+        
+        containerDraw?.classList.remove('hidden');
+        containerUpload?.classList.add('hidden');
+        
+        // Redimensionar el canvas si es necesario
+        setTimeout(() => (window as any).signaturePad?.resize(), 100);
+      } else {
+        tabUpload?.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+        tabUpload?.classList.remove('text-gray-500', 'hover:text-gray-700');
+        
+        tabDraw?.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+        tabDraw?.classList.add('text-gray-500', 'hover:text-gray-700');
+        
+        containerUpload?.classList.remove('hidden');
+        containerDraw?.classList.add('hidden');
+      }
+    }
+
+    // Manejar selección de archivo de firma
+    function handleSignatureFileSelect(event: Event) {
+      const input = event.target as HTMLInputElement;
+      const file = input.files?.[0];
+      
+      if (!file) return;
+      
+      // Validar tipo y tamaño
+      if (!file.type.match('image.*')) {
+        showAlert('error', 'Error', 'Solo se permiten archivos de imagen (JPG, PNG)');
+        input.value = '';
+        return;
+      }
+      
+      if (file.size > 2 * 1024 * 1024) { // 2MB
+        showAlert('error', 'Error', 'El archivo es demasiado grande (Máx. 2MB)');
+        input.value = '';
+        return;
+      }
+      
+      // Guardar blob para envío
+      currentSignatureBlob = file;
+      
+      // Mostrar vista previa
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const previewImage = document.getElementById('uploadPreviewImage') as HTMLImageElement;
+        const previewContainer = document.getElementById('uploadPreviewContainer');
+        const uploadLabel = document.querySelector('label[for="signatureFile"]')?.parentElement;
+        
+        if (previewImage && e.target?.result) {
+          previewImage.src = e.target.result as string;
+          previewContainer?.classList.remove('hidden');
+          uploadLabel?.classList.add('hidden');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Eliminar firma subida
+    function removeUploadedSignature() {
+      currentSignatureBlob = null;
+      
+      const input = document.getElementById('signatureFile') as HTMLInputElement;
+      if (input) input.value = '';
+      
+      document.getElementById('uploadPreviewContainer')?.classList.add('hidden');
+      document.querySelector('label[for="signatureFile"]')?.parentElement?.classList.remove('hidden');
+    }
+
+    // Callback global para captura de firma dibujada
+    (window as any).onSignatureCapture = (blob: Blob, url: string) => {
+      currentSignatureBlob = blob;
+      
+      const previewContainer = document.getElementById('signaturePreviewContainer');
+      if (previewContainer) {
+        previewContainer.classList.remove('hidden');
+      }
+      
+      // Ocultar canvas para mostrar que ya está capturada
+      const canvas = document.querySelector('canvas');
+      if (canvas) {
+        canvas.style.opacity = '0.5';
+        canvas.style.pointerEvents = 'none';
+      }
+    };
+
+    // Resetear todo el estado de firma
+    function resetSignature() {
+      currentSignatureBlob = null;
+      currentSignatureMode = 'draw';
+      
+      // Reset draw pad
+      (window as any).signaturePad?.clearSignature();
+      const canvas = document.querySelector('canvas');
+      if (canvas) {
+        canvas.style.opacity = '1';
+        canvas.style.pointerEvents = 'auto';
+      }
+      document.getElementById('signaturePreviewContainer')?.classList.add('hidden');
+      
+      // Reset upload input
+      const input = document.getElementById('signatureFile') as HTMLInputElement;
+      if (input) input.value = '';
+      document.getElementById('uploadPreviewContainer')?.classList.add('hidden');
+      document.querySelector('label[for="signatureFile"]')?.parentElement?.classList.remove('hidden');
+      
+      // Reset tabs to default (draw)
+      switchSignatureMode('draw');
+    }
+
+    // Mostrar firma existente
+    function showExistingSignature(url: string) {
+      const container = document.getElementById('existingSignatureContainer');
+      const img = document.getElementById('existingSignatureImage') as HTMLImageElement;
+      const drawContainer = document.getElementById('drawSignatureContainer');
+      const uploadContainer = document.getElementById('uploadSignatureContainer');
+      
+      if (container && img) {
+        img.src = url;
+        container.classList.remove('hidden');
+        
+        // Ocultar contenedores de nueva firma
+        if (drawContainer) drawContainer.classList.add('hidden');
+        if (uploadContainer) uploadContainer.classList.add('hidden');
+        
+        // Ocultar tabs también
+        const tabs = document.querySelector('.flex.border-b.border-gray-200.mb-4');
+        if (tabs) tabs.classList.add('hidden');
+      }
+    }
+
+    // Mostrar pad para nueva firma
+    function showNewSignaturePad() {
+      const container = document.getElementById('existingSignatureContainer');
+      const tabs = document.querySelector('.flex.border-b.border-gray-200.mb-4');
+      
+      if (container) container.classList.add('hidden');
+      if (tabs) tabs.classList.remove('hidden');
+      
+      switchSignatureMode('draw');
+    }
 
     // Función helper para mostrar alertas - usando SweetAlert2 cuando esté disponible
     function showAlert(type: 'success' | 'error' | 'warning' | 'info', title: string, message?: string) {
@@ -359,8 +603,8 @@ if (!user || user.role !== 'admin') {
       }
     }
 
-    // Cargar doctores al cargar la página
-    document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar
+    document.addEventListener('DOMContentLoaded', () => {
       // Evitar múltiples inicializaciones
       if (window.doctorsPageInitialized) {
         return;
@@ -368,18 +612,38 @@ if (!user || user.role !== 'admin') {
       window.doctorsPageInitialized = true;
       
       loadDoctors();
-      setupEventListeners();
-    });
-
-    function setupEventListeners() {
-      // Eventos de filtros
+      
+      // Event listeners para filtros
       document.getElementById('searchName')?.addEventListener('input', filterDoctors);
       document.getElementById('filterSpecialization')?.addEventListener('change', filterDoctors);
       document.getElementById('filterStatus')?.addEventListener('change', filterDoctors);
+      document.getElementById('clearFilters')?.addEventListener('click', clearFilters);
 
-      // Evento del formulario
-      document.getElementById('doctorForm')?.addEventListener('submit', handleDoctorSubmit);
-    }
+      // Event listeners para tabs de firma
+      document.getElementById('tabDrawSignature')?.addEventListener('click', () => switchSignatureMode('draw'));
+      document.getElementById('tabUploadSignature')?.addEventListener('click', () => switchSignatureMode('upload'));
+
+      // Event listeners para carga de firma
+      document.getElementById('signatureFile')?.addEventListener('change', handleSignatureFileSelect);
+      document.getElementById('removeUploadBtn')?.addEventListener('click', removeUploadedSignature);
+
+      // Event listener para el formulario
+      const form = document.getElementById('doctorForm');
+      if (form) {
+        form.addEventListener('submit', handleDoctorSubmit);
+      }
+      
+      // Resetear firma dibujada
+      document.getElementById('resetSignatureBtn')?.addEventListener('click', () => {
+        resetSignature();
+      });
+      
+      // Cambiar firma existente
+      document.getElementById('changeSignatureBtn')?.addEventListener('click', () => {
+        document.getElementById('existingSignatureContainer')!.classList.add('hidden');
+        showNewSignaturePad();
+      });
+    });
 
     // Cargar doctores
     async function loadDoctors() {
@@ -654,7 +918,13 @@ if (!user || user.role !== 'admin') {
       document.getElementById('doctorId')!.setAttribute('value', '');
       document.getElementById('passwordSection')!.style.display = 'block';
       document.getElementById('doctorPassword')!.setAttribute('required', 'true');
+      
+      resetSignature();
+      showNewSignaturePad(); // Siempre mostrar pad para nuevo doctor
+      document.getElementById('existingSignatureContainer')!.classList.add('hidden'); // Asegurar oculto
+
       document.getElementById('doctorModal')!.classList.remove('hidden');
+      setTimeout(() => (window as any).signaturePad?.resize(), 100);
     };
 
     // Editar doctor
@@ -675,8 +945,19 @@ if (!user || user.role !== 'admin') {
       document.getElementById('passwordSection')!.style.display = 'block';
       document.getElementById('doctorPassword')!.removeAttribute('required');
       (document.getElementById('doctorPassword') as HTMLInputElement).placeholder = 'Dejar vacío para no cambiar';
+      
+      resetSignature();
+      if (doctor.signature_path) {
+        showExistingSignature(doctor.signature_path);
+      } else {
+        showNewSignaturePad();
+        document.getElementById('existingSignatureContainer')!.classList.add('hidden');
+      }
 
       document.getElementById('doctorModal')!.classList.remove('hidden');
+      if (!doctor.signature_path) {
+        setTimeout(() => (window as any).signaturePad?.resize(), 100);
+      }
     };
 
     // Cerrar modal
@@ -696,6 +977,11 @@ if (!user || user.role !== 'admin') {
       e.preventDefault();
 
       const formData = new FormData(e.target as HTMLFormElement);
+      
+      if (currentSignatureBlob) {
+        formData.append('signature', currentSignatureBlob, 'signature.png');
+      }
+
       const doctorId = formData.get('id');
       const isEdit = doctorId && doctorId !== '';
 

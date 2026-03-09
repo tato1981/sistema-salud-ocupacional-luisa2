@@ -61,7 +61,9 @@ const { className = "" } = Astro.props;
       
       // Expose cleanup method globally
       (window as any).signaturePad = {
-        clearSignature: () => this.clear()
+        clearSignature: () => this.clear(),
+        resize: () => this.resizeCanvas(),
+        isEmpty: () => !this.hasSignature
       };
       
       window.addEventListener('resize', () => this.resizeCanvas());

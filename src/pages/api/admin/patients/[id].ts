@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { PatientService } from '@/lib/patient-service';
 import { requireAuth } from '@/lib/auth';
+import { StorageService } from '@/lib/storage';
 
 // GET - Obtener un paciente específico
 export const GET: APIRoute = async ({ params, cookies }) => {
@@ -86,9 +87,29 @@ export const PUT: APIRoute = async ({ params, request, cookies }) => {
       });
     }
 
-    const body = await request.json();
+    let body: any = {};
+    let signatureFile: File | null = null;
+    
+    const contentType = request.headers.get('content-type') || '';
+    
+    if (contentType.includes('application/json')) {
+      body = await request.json();
+    } else if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      body = Object.fromEntries(formData.entries());
+      
+      const signatureEntry = formData.get('signature');
+      if (signatureEntry instanceof File && signatureEntry.size > 0) {
+        signatureFile = signatureEntry;
+      }
+    } else {
+      return new Response(JSON.stringify({
+        success: false,
+        message: 'Content-Type no soportado'
+      }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+
     console.log('📝 Datos recibidos para UPDATE:', JSON.stringify(body, null, 2));
-    console.log('📸 PhotoPath en UPDATE:', body.photoPath, 'Tipo:', typeof body.photoPath);
     
     // Validar campos requeridos
     const requiredFields = ['name', 'documentType', 'documentNumber', 'dateOfBirth', 'gender'];
@@ -101,6 +122,19 @@ export const PUT: APIRoute = async ({ params, request, cookies }) => {
           status: 400,
           headers: { 'Content-Type': 'application/json' }
         });
+      }
+    }
+
+    // Procesar firma si existe
+    if (signatureFile) {
+      try {
+        const arrayBuffer = await signatureFile.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const filename = `signatures/patients/${body.documentNumber}_${Date.now()}.png`;
+        const url = await StorageService.uploadFile(buffer, filename, 'image/png');
+        body.signaturePath = url;
+      } catch (uploadError) {
+        console.error('Error uploading signature:', uploadError);
       }
     }
 

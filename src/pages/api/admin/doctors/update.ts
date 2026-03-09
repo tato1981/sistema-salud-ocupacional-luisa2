@@ -3,6 +3,7 @@ import { db } from '../../../../lib/database';
 import { requireAuth } from '../../../../lib/auth';
 import { hashPassword } from '../../../../lib/auth';
 import { MigrationService } from '../../../../lib/migration-service';
+import { StorageService } from '../../../../lib/storage';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -29,6 +30,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const professional_license = formData.get('professional_license') as string;
     const password = formData.get('password') as string;
     const is_active = formData.get('is_active') === '1';
+    const signatureFile = formData.get('signature') as File | null;
 
     // Validaciones
     if (!id || !name || !email || !document_number) {
@@ -43,7 +45,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
     // Verificar si el doctor existe
     const [existingDoctor] = await db.execute(
-      'SELECT id FROM users WHERE id = ? AND role = "doctor"',
+      'SELECT id, signature_path FROM users WHERE id = ? AND role = "doctor"',
       [id]
     );
 
@@ -89,6 +91,24 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
 
+    // Manejo de firma
+    let signaturePath = null;
+    if (signatureFile && signatureFile.size > 0) {
+      try {
+        const buffer = Buffer.from(await signatureFile.arrayBuffer());
+        const filename = `signatures/doctor_${document_number}_${Date.now()}.${signatureFile.name.split('.').pop()}`;
+        signaturePath = await StorageService.uploadFile(buffer, filename, signatureFile.type);
+
+        // Eliminar firma anterior si existe
+        const oldSignature = (existingDoctor as any[])[0].signature_path;
+        if (oldSignature) {
+          await StorageService.deleteFile(oldSignature);
+        }
+      } catch (error) {
+        console.error('Error subiendo firma:', error);
+      }
+    }
+
     // Preparar la actualización
     let updateQuery = `
       UPDATE users SET
@@ -109,6 +129,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       professional_license || null,
       is_active ? 1 : 0
     ];
+
+    // Si se subió una nueva firma, actualizar la ruta
+    if (signaturePath) {
+      updateQuery += ', signature_path = ?';
+      updateParams.push(signaturePath);
+    }
 
     // Si se proporcionó una nueva contraseña, incluirla en la actualización
     if (password && password.trim() !== '') {

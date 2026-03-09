@@ -3,6 +3,7 @@ import { db } from '../../../../lib/database';
 import { requireAuth } from '../../../../lib/auth';
 import { hashPassword } from '../../../../lib/auth';
 import { MigrationService } from '../../../../lib/migration-service';
+import { StorageService } from '../../../../lib/storage';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -19,7 +20,6 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Asegurar que la base de datos esté actualizada
     await MigrationService.runMigrations();
 
-    // Cambiar a FormData para soportar archivos
     const formData = await request.formData();
     console.log('📝 Datos del doctor recibidos');
 
@@ -31,6 +31,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const professional_license = formData.get('professional_license') as string;
     const password = formData.get('password') as string;
     const is_active = formData.get('is_active') === '1';
+    const signatureFile = formData.get('signature') as File | null;
 
     // Validaciones
     if (!name || !email || !document_number || !password) {
@@ -75,6 +76,19 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
 
+    // Manejo de firma
+    let signaturePath = null;
+    if (signatureFile && signatureFile.size > 0) {
+      try {
+        const buffer = Buffer.from(await signatureFile.arrayBuffer());
+        const filename = `signatures/doctor_${document_number}_${Date.now()}.${signatureFile.name.split('.').pop()}`;
+        signaturePath = await StorageService.uploadFile(buffer, filename, signatureFile.type);
+      } catch (error) {
+        console.error('Error subiendo firma:', error);
+        // Continuamos sin firma si falla, o podríamos retornar error
+      }
+    }
+
     // Hash de la contraseña
     const passwordHash = await hashPassword(password);
 
@@ -82,8 +96,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const [result] = await db.execute(
       `INSERT INTO users (
         name, email, password_hash, document_number, phone,
-        specialization, professional_license, role, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'doctor', ?)`,
+        specialization, professional_license, role, is_active, signature_path
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'doctor', ?, ?)`,
       [
         name,
         email,
@@ -92,7 +106,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         phone || null,
         specialization || 'Medicina General',
         professional_license || null,
-        is_active ? 1 : 0
+        is_active ? 1 : 0,
+        signaturePath
       ]
     );
 
