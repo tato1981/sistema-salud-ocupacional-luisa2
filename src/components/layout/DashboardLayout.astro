@@ -1,0 +1,77 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Sidebar from './Sidebar.astro';
+import Header from './Header.astro';
+
+interface Props {
+  title: string;
+  user: any;
+}
+
+const { title, user } = Astro.props;
+const currentPath = Astro.url.pathname;
+const isImpersonating = Astro.cookies.has('admin-session');
+---
+
+<Layout title={title}>
+  <div class="min-h-screen bg-gray-50 pb-12">
+    <!-- Impersonation Banner -->
+    {isImpersonating && (
+      <div class="fixed bottom-0 left-0 right-0 z-50 bg-red-600 text-white px-4 py-3 shadow-lg flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <svg class="w-6 h-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+          </svg>
+          <span class="font-medium">Modo Superadmin: Estás viendo el sistema como {user.name}</span>
+        </div>
+        <button 
+          id="stopImpersonationBtn"
+          class="bg-white text-red-600 px-4 py-1 rounded-full text-sm font-bold hover:bg-red-50 transition-colors shadow-sm"
+        >
+          Volver a Admin
+        </button>
+      </div>
+    )}
+
+    <!-- Sidebar -->
+    <Sidebar user={user} currentPath={currentPath} />
+
+    <!-- Main Content Wrapper -->
+    <div class:list={[
+      "w-full transition-all duration-300",
+      currentPath === '/dashboard' ? 'lg:pl-64' : ''
+    ]}>
+      <!-- Header -->
+      <Header user={user} />
+
+      <!-- Page Content -->
+      <main class="w-full overflow-x-hidden overflow-y-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+        <slot />
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const stopImpersonationBtn = document.getElementById('stopImpersonationBtn');
+    if (stopImpersonationBtn) {
+      stopImpersonationBtn.addEventListener('click', async () => {
+        try {
+          const response = await fetch('/api/auth/stop-impersonation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          const result = await response.json();
+          
+          if (result.success) {
+            window.location.href = result.redirectUrl || '/admin/dashboard';
+          } else {
+            alert(result.message || 'Error al restaurar sesión');
+          }
+        } catch (error) {
+          console.error('Error stopping impersonation:', error);
+          alert('Error de conexión');
+        }
+      });
+    }
+  </script>
+</Layout>
