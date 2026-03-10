@@ -26,7 +26,7 @@ export class MigrationService {
       const exists = await this.columnExists('patients', 'photo_path');
       
       if (exists) {
-        console.log('✅ Columna photo_path ya existe en tabla patients');
+        // console.log('✅ Columna photo_path ya existe en tabla patients');
         return true;
       }
 
@@ -50,7 +50,7 @@ export class MigrationService {
   // Crear tabla de certificados de aptitud si no existe
   static async createWorkCertificatesTable(): Promise<boolean> {
     try {
-      console.log('🔄 Verificando/creando tabla work_certificates...');
+      // console.log('🔄 Verificando/creando tabla work_certificates...');
       await db.execute(`
         CREATE TABLE IF NOT EXISTS work_certificates (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -72,7 +72,7 @@ export class MigrationService {
           CONSTRAINT fk_work_cert_appointment FOREIGN KEY (appointment_id) REFERENCES appointments(id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
-      console.log('✅ Tabla work_certificates lista');
+      // console.log('✅ Tabla work_certificates lista');
       return true;
     } catch (error) {
       console.error('❌ Error creando tabla work_certificates:', error);
@@ -83,7 +83,7 @@ export class MigrationService {
   // Crear tablas de empresas y contactos si no existen
   static async createCompaniesTables(): Promise<boolean> {
     try {
-      console.log('🔄 Verificando/creando tablas companies y company_contacts...');
+      // console.log('🔄 Verificando/creando tablas companies y company_contacts...');
 
       await db.execute(`
         CREATE TABLE IF NOT EXISTS companies (
@@ -123,10 +123,10 @@ export class MigrationService {
         `);
         console.log('✅ Columna company_id agregada a patients');
       } else {
-        console.log('✅ Columna company_id ya existe en patients');
+        // console.log('✅ Columna company_id ya existe en patients');
       }
 
-      console.log('✅ Tablas companies y company_contacts listas');
+      // console.log('✅ Tablas companies y company_contacts listas');
       return true;
     } catch (error) {
       console.error('❌ Error creando tablas de empresas:', error);
@@ -137,7 +137,7 @@ export class MigrationService {
   // Actualizar tabla companies con campos adicionales
   static async updateCompaniesTable(): Promise<boolean> {
     try {
-      console.log('🔄 Actualizando tabla companies con campos adicionales...');
+      // console.log('🔄 Actualizando tabla companies con campos adicionales...');
 
       // Verificar y agregar responsible_name
       const hasResponsibleName = await this.columnExists('companies', 'responsible_name');
@@ -169,7 +169,7 @@ export class MigrationService {
         console.log('✅ Columna status agregada a companies');
       }
 
-      console.log('✅ Tabla companies actualizada correctamente');
+      // console.log('✅ Tabla companies actualizada correctamente');
       return true;
     } catch (error) {
       console.error('❌ Error actualizando tabla companies:', error);
@@ -183,7 +183,7 @@ export class MigrationService {
       const exists = await this.columnExists('users', 'professional_license');
       
       if (exists) {
-        console.log('✅ Columna professional_license ya existe en tabla users');
+        // console.log('✅ Columna professional_license ya existe en tabla users');
         return true;
       }
 
@@ -206,7 +206,7 @@ export class MigrationService {
 
   // Ejecutar todas las migraciones necesarias
   static async runMigrations(): Promise<void> {
-    console.log('🚀 Ejecutando migraciones de base de datos...');
+    // console.log('🚀 Ejecutando migraciones de base de datos...');
     
     try {
       // Migración 1: Agregar columna photo_path
@@ -220,7 +220,7 @@ export class MigrationService {
       // Migración 5: Agregar columna professional_license a users
       await this.addProfessionalLicenseColumn();
       
-      console.log('✅ Todas las migraciones completadas');
+      // console.log('✅ Todas las migraciones completadas');
     } catch (error) {
       console.error('❌ Error ejecutando migraciones:', error);
       throw error;

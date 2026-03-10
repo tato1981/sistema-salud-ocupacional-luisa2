@@ -1,0 +1,27 @@
+---
+import { PatientService } from '../lib/patient-service';
+
+let patient = null;
+let error = null;
+
+try {
+  // Try to get patient with ID 1 (or any existing ID)
+  // We can try to get the first patient from the list to be sure we have a valid ID
+  const patients = await PatientService.getAllPatients(1);
+  if (patients.length > 0) {
+    patient = await PatientService.getPatientById(patients[0].id);
+  } else {
+    error = "No patients found";
+  }
+} catch (e) {
+  error = e instanceof Error ? e.message : String(e);
+}
+---
+
+<html>
+<body>
+  <h1>Test DB</h1>
+  {error && <p style="color: red">Error: {error}</p>}
+  {patient && <pre>{JSON.stringify(patient, null, 2)}</pre>}
+</body>
+</html>

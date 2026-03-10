@@ -89,11 +89,14 @@ export const PUT: APIRoute = async ({ params, request, cookies }) => {
 
     let body: any = {};
     let signatureFile: File | null = null;
+    let photoFile: File | null = null;
+    let deletePhoto = false;
     
     const contentType = request.headers.get('content-type') || '';
     
     if (contentType.includes('application/json')) {
       body = await request.json();
+      if (body.deletePhoto) deletePhoto = true;
     } else if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData();
       body = Object.fromEntries(formData.entries());
@@ -102,6 +105,15 @@ export const PUT: APIRoute = async ({ params, request, cookies }) => {
       if (signatureEntry instanceof File && signatureEntry.size > 0) {
         signatureFile = signatureEntry;
       }
+
+      const photoEntry = formData.get('photo');
+      if (photoEntry instanceof File && photoEntry.size > 0) {
+        photoFile = photoEntry;
+      }
+
+      if (formData.get('deletePhoto') === 'true') {
+        deletePhoto = true;
+      }
     } else {
       return new Response(JSON.stringify({
         success: false,
@@ -109,8 +121,6 @@ export const PUT: APIRoute = async ({ params, request, cookies }) => {
       }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
-    console.log('📝 Datos recibidos para UPDATE:', JSON.stringify(body, null, 2));
-    
     // Validar campos requeridos
     const requiredFields = ['name', 'documentType', 'documentNumber', 'dateOfBirth', 'gender'];
     for (const field of requiredFields) {
@@ -125,9 +135,40 @@ export const PUT: APIRoute = async ({ params, request, cookies }) => {
       }
     }
 
+    // Obtener paciente actual para manejar eliminación de archivos
+    const currentPatient = await PatientService.getPatientById(parseInt(patientId));
+    
+    // Helper para extraer key de la URL
+    const getKeyFromUrl = (url: string) => {
+      if (!url) return null;
+      try {
+        if (url.startsWith('/uploads/')) {
+          return url.replace('/uploads/', '');
+        }
+        // Para R2/S3, intentamos extraer la parte después del dominio
+        const urlObj = new URL(url);
+        // Si es una URL completa, el pathname sin el primer slash es el key
+        // Pero hay que tener cuidado con el bucket name si está en el path
+        // Asumimos que el StorageService devuelve URLs donde el pathname (menos el bucket si aplica) es el key
+        // Simplificación: si contiene 'photos/' o 'signatures/', cortamos desde ahí
+        if (url.includes('photos/')) return url.substring(url.indexOf('photos/'));
+        if (url.includes('signatures/')) return url.substring(url.indexOf('signatures/'));
+        return urlObj.pathname.substring(1);
+      } catch (e) {
+        // Si no es una URL válida, devolvemos el string original (puede ser path relativo)
+        return url;
+      }
+    };
+
     // Procesar firma si existe
     if (signatureFile) {
       try {
+        // Eliminar firma anterior si existe
+        if (currentPatient?.signature_path) {
+          const oldKey = getKeyFromUrl(currentPatient.signature_path);
+          if (oldKey) await StorageService.deleteFile(oldKey);
+        }
+
         const arrayBuffer = await signatureFile.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         const filename = `signatures/patients/${body.documentNumber}_${Date.now()}.png`;
@@ -135,6 +176,28 @@ export const PUT: APIRoute = async ({ params, request, cookies }) => {
         body.signaturePath = url;
       } catch (uploadError) {
         console.error('Error uploading signature:', uploadError);
+      }
+    }
+
+    // Procesar foto de perfil si existe o si se solicitó eliminar
+    if (photoFile || deletePhoto) {
+      // Eliminar foto anterior si existe
+      if (currentPatient?.photo_path) {
+        const oldKey = getKeyFromUrl(currentPatient.photo_path);
+        if (oldKey) await StorageService.deleteFile(oldKey);
+      }
+    }
+
+    if (photoFile) {
+      try {
+        const arrayBuffer = await photoFile.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const fileExt = photoFile.name.split('.').pop() || 'jpg';
+        const filename = `photos/patients/${body.documentNumber}_${Date.now()}.${fileExt}`;
+        const url = await StorageService.uploadFile(buffer, filename, photoFile.type || 'image/jpeg');
+        body.photoPath = url;
+      } catch (uploadError) {
+        console.error('Error uploading photo:', uploadError);
       }
     }
 
@@ -176,16 +239,13 @@ export const PUT: APIRoute = async ({ params, request, cookies }) => {
       companyId: body.companyId === '' ? null : (body.companyId ? parseInt(body.companyId) : undefined),
       emergencyContactName: body.emergencyContactName || undefined,
       emergencyContactPhone: body.emergencyContactPhone || undefined,
-      photoPath: body.photoPath || undefined,
+      photoPath: deletePhoto ? null : (body.photoPath || undefined),
       signaturePath: body.signaturePath || undefined,
       allergies: body.allergies || undefined,
       medications: body.medications || undefined,
       medicalConditions: body.medicalConditions || undefined,
       updatedBy: user.id
     };
-
-    console.log('🏥 Datos preparados para UPDATE PatientService:', JSON.stringify(patientData, null, 2));
-    console.log('📸 PhotoPath en patientData UPDATE:', patientData.photoPath, 'Definido:', !!patientData.photoPath);
 
     const result = await PatientService.updatePatientAdmin(parseInt(patientId), patientData);
 
@@ -259,9 +319,41 @@ export const DELETE: APIRoute = async ({ params, cookies }) => {
       });
     }
 
+    // Obtener paciente para eliminar archivos
+    const patient = await PatientService.getPatientById(parseInt(patientId));
+    
+    // Intentar eliminar paciente
     const result = await PatientService.deletePatientAdmin(parseInt(patientId));
 
     if (result.success) {
+      // Si se eliminó correctamente, limpiar archivos de R2
+      if (patient) {
+        const getKeyFromUrl = (url: string) => {
+          if (!url) return null;
+          try {
+            if (url.startsWith('/uploads/')) {
+              return url.replace('/uploads/', '');
+            }
+            const urlObj = new URL(url);
+            if (url.includes('photos/')) return url.substring(url.indexOf('photos/'));
+            if (url.includes('signatures/')) return url.substring(url.indexOf('signatures/'));
+            return urlObj.pathname.substring(1);
+          } catch (e) {
+            return url;
+          }
+        };
+
+        if (patient.photo_path) {
+          const key = getKeyFromUrl(patient.photo_path);
+          if (key) await StorageService.deleteFile(key).catch(e => console.error('Error deleting photo:', e));
+        }
+
+        if (patient.signature_path) {
+          const key = getKeyFromUrl(patient.signature_path);
+          if (key) await StorageService.deleteFile(key).catch(e => console.error('Error deleting signature:', e));
+        }
+      }
+
       return new Response(JSON.stringify({
         success: true,
         message: 'Paciente eliminado exitosamente'

@@ -183,6 +183,58 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
         </div>
         
         <form id="patientForm" class="space-y-4">
+          <!-- Foto de perfil -->
+          <div class="flex flex-col items-center mb-6">
+            <!-- Camera UI (Hidden by default) -->
+            <div id="cameraContainer" class="hidden w-full max-w-xs mb-4 bg-gray-900 rounded-lg overflow-hidden relative shadow-xl">
+                <video id="cameraFeed" autoplay playsinline class="w-full h-64 object-cover"></video>
+                <div class="absolute bottom-4 left-0 right-0 flex justify-center space-x-4 z-10">
+                    <button type="button" id="takePhotoBtn" class="bg-white text-gray-900 rounded-full p-3 shadow-lg hover:bg-gray-100 transition-colors transform hover:scale-110" title="Capturar">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        </svg>
+                    </button>
+                    <button type="button" id="cancelCameraBtn" class="bg-red-500 text-white rounded-full p-3 shadow-lg hover:bg-red-600 transition-colors transform hover:scale-110" title="Cancelar">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div id="photoDisplayContainer" class="relative group">
+              <div class="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-100 shadow-lg bg-gray-100 flex items-center justify-center">
+                <img id="photoPreview" src="" alt="Foto de perfil" class="w-full h-full object-cover hidden" />
+                <svg id="photoPlaceholder" class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              
+              <!-- File Upload Label -->
+              <label for="photoInput" class="absolute bottom-0 right-0 bg-blue-600 p-2 rounded-full text-white cursor-pointer hover:bg-blue-700 shadow-md transition-colors z-10" title="Subir foto">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+              </label>
+
+              <!-- Camera Button -->
+              <button type="button" id="openCameraBtn" class="absolute bottom-0 left-0 bg-green-600 p-2 rounded-full text-white cursor-pointer hover:bg-green-700 shadow-md transition-colors z-10" title="Tomar foto con cámara">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+
+              <input type="file" id="photoInput" name="photo" accept="image/*" class="hidden" />
+              <button type="button" id="removePhotoBtn" class="absolute top-0 -right-2 bg-red-500 text-white p-1 rounded-full shadow-md hidden hover:bg-red-600 z-20" title="Eliminar foto">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p class="text-sm text-gray-500 mt-2">Foto de perfil (opcional)</p>
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
@@ -264,19 +316,108 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
               <input type="tel" name="emergencyContactPhone" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
             </div>
           </div>
-          
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Alergias</label>
-              <textarea name="allergies" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Describe las alergias conocidas..."></textarea>
+
+          <!-- Información Médica -->
+          <div class="border-t pt-4 mt-4">
+            <h4 class="text-sm font-medium text-gray-900 mb-3">Información Médica</h4>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Alergias</label>
+                <textarea name="allergies" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Lista de alergias conocidas..."></textarea>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Medicamentos Actuales</label>
+                <textarea name="medications" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Medicamentos que toma actualmente..."></textarea>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Condiciones Médicas</label>
+                <textarea name="medicalConditions" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Enfermedades crónicas o condiciones relevantes..."></textarea>
+              </div>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Medicamentos Actuales</label>
-              <textarea name="medications" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Lista de medicamentos que toma actualmente..."></textarea>
+          </div>
+
+          <!-- Firma del Paciente -->
+          <div class="col-span-full mt-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Firma del Paciente</label>
+            
+            <!-- Tabs para elegir método de firma -->
+            <div class="flex border-b border-gray-200 mb-4">
+              <button type="button" id="tabDrawSignature" class="px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600 focus:outline-none">
+                Dibujar Firma
+              </button>
+              <button type="button" id="tabUploadSignature" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 focus:outline-none">
+                Subir Imagen
+              </button>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Condiciones Médicas</label>
-              <textarea name="medicalConditions" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Condiciones médicas existentes..."></textarea>
+
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              
+              <!-- Firma existente -->
+              <div id="existingSignatureContainer" class="hidden mb-4 text-center">
+                <p class="text-sm text-gray-500 mb-2">Firma Actual</p>
+                <img id="existingSignatureImage" src="" alt="Firma del paciente" class="mx-auto max-h-32 border border-gray-300 rounded bg-white mb-3" />
+                <button type="button" id="changeSignatureBtn" class="text-sm text-blue-600 hover:text-blue-800 font-medium underline">
+                  Cambiar Firma
+                </button>
+              </div>
+
+              <!-- Contenedor para dibujar firma -->
+              <div id="drawSignatureContainer">
+                <div id="newSignatureContainer">
+                  <SignaturePad />
+                  <div id="signaturePreviewContainer" class="hidden mt-3 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                      <div class="bg-green-100 p-2 rounded-full">
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                      </div>
+                      <div>
+                        <p class="text-sm font-medium text-green-800">Firma capturada correctamente</p>
+                        <p class="text-xs text-green-600">Lista para guardar</p>
+                      </div>
+                    </div>
+                    <button type="button" id="resetSignatureBtn" class="text-sm text-red-600 hover:text-red-800 font-medium">
+                      Cambiar
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Contenedor para subir imagen -->
+              <div id="uploadSignatureContainer" class="hidden">
+                <div class="flex flex-col items-center justify-center w-full">
+                  <label for="signatureFile" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                      <svg class="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                      </svg>
+                      <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Click para subir</span> o arrastrar y soltar</p>
+                      <p class="text-xs text-gray-500">PNG, JPG (MAX. 2MB)</p>
+                    </div>
+                    <input id="signatureFile" type="file" class="hidden" accept="image/png, image/jpeg, image/jpg" />
+                  </label>
+                </div>
+                
+                <div id="uploadPreviewContainer" class="hidden mt-4 text-center relative">
+                  <p class="text-sm text-gray-500 mb-2">Vista previa</p>
+                  <div class="relative inline-block">
+                    <img id="uploadPreviewImage" src="" alt="Vista previa firma" class="max-h-32 border border-gray-300 rounded bg-white" />
+                    <button type="button" id="removeUploadBtn" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-md">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="mt-2 text-green-600 text-sm font-medium flex items-center justify-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Imagen seleccionada
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
 
@@ -332,26 +473,79 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
   let currentPage = 1;
   const itemsPerPage = 10;
 
-  // Elementos de firma
-  const existingSignatureContainer = document.getElementById('existingSignatureContainer')!;
-  const newSignatureContainer = document.getElementById('newSignatureContainer')!;
+  // Variables adicionales para archivos y modo
+  let currentSignatureMode: 'draw' | 'upload' = 'draw';
+  let photoFile: File | null = null;
+  let signatureFile: File | null = null;
+  let deletePhoto = false;
+
+  // Elementos de UI adicionales
+  const tabDrawSignature = document.getElementById('tabDrawSignature');
+  const tabUploadSignature = document.getElementById('tabUploadSignature');
+  const drawSignatureContainer = document.getElementById('drawSignatureContainer');
+  const uploadSignatureContainer = document.getElementById('uploadSignatureContainer');
+  const signatureFileInput = document.getElementById('signatureFile') as HTMLInputElement;
+  const uploadPreviewContainer = document.getElementById('uploadPreviewContainer');
+  const uploadPreviewImage = document.getElementById('uploadPreviewImage') as HTMLImageElement;
+  const removeUploadBtn = document.getElementById('removeUploadBtn');
+
+  // Elementos de Foto
+  const photoInput = document.getElementById('photoInput') as HTMLInputElement;
+  const photoPreview = document.getElementById('photoPreview') as HTMLImageElement;
+  const photoPlaceholder = document.getElementById('photoPlaceholder');
+  const removePhotoBtn = document.getElementById('removePhotoBtn');
+
+  // Elementos de firma (con comprobación de nulidad)
+  const existingSignatureContainer = document.getElementById('existingSignatureContainer');
+  const newSignatureContainer = document.getElementById('newSignatureContainer');
   const existingSignatureImage = document.getElementById('existingSignatureImage') as HTMLImageElement;
-  const signaturePreviewContainer = document.getElementById('signaturePreviewContainer')!;
-  const changeSignatureBtn = document.getElementById('changeSignatureBtn')!;
-  const resetSignatureBtn = document.getElementById('resetSignatureBtn')!;
+  const signaturePreviewContainer = document.getElementById('signaturePreviewContainer');
+  const changeSignatureBtn = document.getElementById('changeSignatureBtn');
+  const resetSignatureBtn = document.getElementById('resetSignatureBtn');
 
   // Funciones de firma
+  function switchSignatureMode(mode: 'draw' | 'upload') {
+    currentSignatureMode = mode;
+    
+    if (mode === 'draw') {
+      tabDrawSignature?.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+      tabDrawSignature?.classList.remove('text-gray-500', 'hover:text-gray-700');
+      tabUploadSignature?.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+      tabUploadSignature?.classList.add('text-gray-500', 'hover:text-gray-700');
+      
+      drawSignatureContainer?.classList.remove('hidden');
+      uploadSignatureContainer?.classList.add('hidden');
+      
+      // Resize signature pad
+      setTimeout(() => {
+        if ((window as any).signaturePad) {
+          (window as any).signaturePad.resize();
+        }
+      }, 100);
+    } else {
+      tabUploadSignature?.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+      tabUploadSignature?.classList.remove('text-gray-500', 'hover:text-gray-700');
+      tabDrawSignature?.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+      tabDrawSignature?.classList.add('text-gray-500', 'hover:text-gray-700');
+      
+      uploadSignatureContainer?.classList.remove('hidden');
+      drawSignatureContainer?.classList.add('hidden');
+    }
+  }
+
+  // ... (rest of the file) ...
+
   function showExistingSignature(url: string) {
-    existingSignatureImage.src = url;
-    existingSignatureContainer.classList.remove('hidden');
-    newSignatureContainer.classList.add('hidden');
+    if (existingSignatureImage) existingSignatureImage.src = url;
+    if (existingSignatureContainer) existingSignatureContainer.classList.remove('hidden');
+    if (newSignatureContainer) newSignatureContainer.classList.add('hidden');
     currentSignatureBlob = null;
   }
 
   function showNewSignaturePad() {
-    existingSignatureContainer.classList.add('hidden');
-    newSignatureContainer.classList.remove('hidden');
-    signaturePreviewContainer.classList.add('hidden');
+    if (existingSignatureContainer) existingSignatureContainer.classList.add('hidden');
+    if (newSignatureContainer) newSignatureContainer.classList.remove('hidden');
+    if (signaturePreviewContainer) signaturePreviewContainer.classList.add('hidden');
     
     // Resize signature pad when visible
     setTimeout(() => {
@@ -377,11 +571,178 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
     });
   }
 
+  // Event Listeners for Tabs and Files
+  tabDrawSignature?.addEventListener('click', () => switchSignatureMode('draw'));
+  tabUploadSignature?.addEventListener('click', () => switchSignatureMode('upload'));
+  
+  photoInput?.addEventListener('change', handlePhotoSelect);
+  removePhotoBtn?.addEventListener('click', removePhoto);
+  
+  signatureFileInput?.addEventListener('change', handleSignatureFileSelect);
+  removeUploadBtn?.addEventListener('click', removeUploadSignature);
+
   // Callback global para captura de firma
   (window as any).onSignatureCapture = (blob: Blob, url: string) => {
     currentSignatureBlob = blob;
     signaturePreviewContainer.classList.remove('hidden');
   };
+
+  // Manejo de Foto de Perfil
+  function handlePhotoSelect(e: Event) {
+    const input = e.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      
+      // Validar tamaño (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        showAlert('error', 'Error', 'La imagen no puede superar los 5MB');
+        input.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (photoPreview && e.target?.result) {
+          photoPreview.src = e.target.result as string;
+          photoPreview.classList.remove('hidden');
+          photoPlaceholder?.classList.add('hidden');
+          removePhotoBtn?.classList.remove('hidden');
+        }
+      };
+      reader.readAsDataURL(file);
+      photoFile = file;
+      deletePhoto = false;
+    }
+  }
+
+  // Exponer globalmente para evitar ReferenceError si se llama desde HTML
+  (window as any).handlePhotoSelect = handlePhotoSelect;
+
+  function removePhoto() {
+    if (photoInput) photoInput.value = '';
+    if (photoPreview) {
+      photoPreview.src = '';
+      photoPreview.classList.add('hidden');
+    }
+    photoPlaceholder?.classList.remove('hidden');
+    removePhotoBtn?.classList.add('hidden');
+    photoFile = null;
+    deletePhoto = true;
+  }
+
+  // Manejo de Archivo de Firma
+  function handleSignatureFileSelect(e: Event) {
+    const input = e.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      
+      // Validar tamaño (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        showAlert('error', 'Error', 'La imagen no puede superar los 5MB');
+        input.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (uploadPreviewImage && e.target?.result) {
+          uploadPreviewImage.src = e.target.result as string;
+          uploadPreviewContainer?.classList.remove('hidden');
+        }
+      };
+      reader.readAsDataURL(file);
+      signatureFile = file;
+    }
+  }
+
+  function removeUploadSignature() {
+    if (signatureFileInput) signatureFileInput.value = '';
+    if (uploadPreviewImage) uploadPreviewImage.src = '';
+    uploadPreviewContainer?.classList.add('hidden');
+    signatureFile = null;
+  }
+
+  // --- Lógica de Cámara ---
+  const cameraContainer = document.getElementById('cameraContainer');
+  const photoDisplayContainer = document.getElementById('photoDisplayContainer');
+  const cameraFeed = document.getElementById('cameraFeed') as HTMLVideoElement;
+  const takePhotoBtn = document.getElementById('takePhotoBtn');
+  const cancelCameraBtn = document.getElementById('cancelCameraBtn');
+  const openCameraBtn = document.getElementById('openCameraBtn');
+  let mediaStream: MediaStream | null = null;
+
+  async function openCamera() {
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+            facingMode: 'user',
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+        } 
+      });
+      cameraFeed.srcObject = mediaStream;
+      cameraContainer?.classList.remove('hidden');
+      photoDisplayContainer?.classList.add('hidden');
+    } catch (err) {
+      console.error("Error accessing camera: ", err);
+      showAlert('error', 'Error', 'No se pudo acceder a la cámara. Verifique los permisos.');
+    }
+  }
+
+  function closeCamera() {
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+      mediaStream = null;
+    }
+    cameraFeed.srcObject = null;
+    cameraContainer?.classList.add('hidden');
+    photoDisplayContainer?.classList.remove('hidden');
+  }
+
+  function takePhoto() {
+    if (!mediaStream) return;
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = cameraFeed.videoWidth;
+    canvas.height = cameraFeed.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+        ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+        
+        canvas.toBlob((blob) => {
+            if (blob) {
+                // Create a File object from the Blob
+                const file = new File([blob], "camera_capture.jpg", { type: "image/jpeg" });
+                
+                // Update photoFile variable (used in form submission)
+                photoFile = file;
+                deletePhoto = false;
+
+                // Update preview
+                if (photoPreview) {
+                    const newUrl = URL.createObjectURL(blob);
+                    
+                    // Force refresh
+                    photoPreview.src = '';
+                    setTimeout(() => {
+                        photoPreview.src = newUrl;
+                        photoPreview.classList.remove('hidden');
+                        photoPlaceholder?.classList.add('hidden');
+                        removePhotoBtn?.classList.remove('hidden');
+                    }, 50);
+                }
+                
+                closeCamera();
+            }
+        }, 'image/jpeg', 0.8);
+    }
+  }
+
+  // Event Listeners para Cámara
+  openCameraBtn?.addEventListener('click', openCamera);
+  cancelCameraBtn?.addEventListener('click', closeCamera);
+  takePhotoBtn?.addEventListener('click', takePhoto);
+
 
   // Cargar estadísticas
   async function loadStatistics() {
@@ -495,9 +856,13 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
         <td class="px-6 py-4 whitespace-nowrap">
           <div class="flex items-center">
             <div class="flex-shrink-0 h-10 w-10">
-              <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center border border-gray-200">
-                <span class="text-sm font-medium text-gray-700">${patient.name.charAt(0).toUpperCase()}</span>
-              </div>
+              ${patient.photo_path ? `
+                <img class="h-10 w-10 rounded-full object-cover border border-gray-200" src="${patient.photo_path}" alt="${patient.name}" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div class=\'h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center border border-gray-200\'><span class=\'text-sm font-medium text-gray-700\'>${patient.name.charAt(0).toUpperCase()}</span></div>'"/>
+              ` : `
+                <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center border border-gray-200">
+                  <span class="text-sm font-medium text-gray-700">${patient.name.charAt(0).toUpperCase()}</span>
+                </div>
+              `}
             </div>
             <div class="ml-4">
               <div class="text-sm font-medium text-gray-900">${patient.name}</div>
@@ -607,8 +972,26 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
     loadCompaniesIntoSelect('');
     syncCompanyInputState();
     
-    // Resetear firma
+    // Resetear firma y foto
     currentSignatureBlob = null;
+    photoFile = null;
+    signatureFile = null;
+    deletePhoto = false;
+    
+    // Reset UI
+    switchSignatureMode('draw');
+    if (photoInput) photoInput.value = '';
+    if (photoPreview && photoPlaceholder && removePhotoBtn) {
+      photoPreview.src = '';
+      photoPreview.classList.add('hidden');
+      photoPlaceholder.classList.remove('hidden');
+      removePhotoBtn.classList.add('hidden');
+    }
+    
+    if (signatureFileInput) signatureFileInput.value = '';
+    if (uploadPreviewContainer) uploadPreviewContainer.classList.add('hidden');
+    if (uploadPreviewImage) uploadPreviewImage.src = '';
+
     showNewSignaturePad();
   }
 
@@ -689,8 +1072,29 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
     const formData = new FormData(patientForm);
     
     // Agregar firma si existe
-    if (currentSignatureBlob) {
-      formData.append('signature', currentSignatureBlob, 'signature.png');
+    if (currentSignatureMode === 'draw') {
+      // Obtener el blob directamente del componente SignaturePad
+      if ((window as any).signaturePad && typeof (window as any).signaturePad.getBlob === 'function') {
+        const blob = await (window as any).signaturePad.getBlob();
+        if (blob) {
+          formData.append('signature', blob, 'signature.png');
+        }
+      } else if (currentSignatureBlob) {
+        // Fallback por si getBlob no está disponible (versión anterior del componente)
+        formData.append('signature', currentSignatureBlob, 'signature.png');
+      }
+    } else if (currentSignatureMode === 'upload' && signatureFile) {
+      formData.append('signature', signatureFile);
+    }
+
+    // Agregar foto si existe (ya sea subida o de cámara)
+    if (photoFile) {
+      formData.delete('photo'); // Eliminar el campo del input file original
+      formData.append('photo', photoFile);
+    }
+
+    if (deletePhoto) {
+      formData.append('deletePhoto', 'true');
     }
 
     // Validación extra del documento
@@ -811,73 +1215,149 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
     window.location.href = `/admin/patients/${id}#appointments`;
   };
 
-  (window as any).editPatient = async (id: number) => {
+    (window as any).editPatient = async (id: number) => {
     try {
+      console.log('Fetching patient data for ID:', id);
       // Obtener datos del paciente
       const response = await fetch(`/api/admin/patients/${id}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error('La respuesta del servidor no es JSON válido');
+      }
+
       const result = await response.json();
+      console.log('Patient data received:', result);
 
       if (result.success && result.data) {
         const patient = result.data;
 
-        // Poblar el formulario con los datos del paciente
-        (document.querySelector('input[name="name"]') as HTMLInputElement).value = patient.name || '';
-        (document.querySelector('input[name="email"]') as HTMLInputElement).value = patient.email || '';
-        (document.querySelector('input[name="phone"]') as HTMLInputElement).value = patient.phone || '';
-        (document.querySelector('select[name="documentType"]') as HTMLSelectElement).value = patient.document_type || '';
-        (document.querySelector('input[name="documentNumber"]') as HTMLInputElement).value = patient.document_number || '';
+        // Poblar el formulario con los datos del paciente - usando helper para seguridad
+        const setVal = (selector: string, value: string | null | undefined) => {
+          try {
+            const el = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+            if (el) {
+              el.value = value || '';
+            } else {
+              console.warn(`Element not found: ${selector}`);
+            }
+          } catch (e) {
+            console.error(`Error setting value for ${selector}:`, e);
+          }
+        };
 
-        // Formatear fecha de nacimiento para el input date (YYYY-MM-DD)
-        if (patient.date_of_birth) {
-          const date = new Date(patient.date_of_birth);
-          const formattedDate = !isNaN(date.getTime())
-            ? date.toISOString().split('T')[0]
-            : '';
-          (document.querySelector('input[name="dateOfBirth"]') as HTMLInputElement).value = formattedDate;
-        } else {
-          (document.querySelector('input[name="dateOfBirth"]') as HTMLInputElement).value = '';
+        try {
+          console.log('Populating basic fields...');
+          setVal('input[name="name"]', patient.name);
+          setVal('input[name="email"]', patient.email);
+          setVal('input[name="phone"]', patient.phone);
+          setVal('select[name="documentType"]', patient.document_type);
+          setVal('input[name="documentNumber"]', patient.document_number);
+
+          // Formatear fecha de nacimiento para el input date (YYYY-MM-DD)
+          if (patient.date_of_birth) {
+            const date = new Date(patient.date_of_birth);
+            const formattedDate = !isNaN(date.getTime())
+              ? date.toISOString().split('T')[0]
+              : '';
+            setVal('input[name="dateOfBirth"]', formattedDate);
+          } else {
+            setVal('input[name="dateOfBirth"]', '');
+          }
+
+          setVal('select[name="gender"]', patient.gender);
+          setVal('select[name="bloodType"]', patient.blood_type);
+          setVal('textarea[name="address"]', patient.address);
+          setVal('input[name="occupation"]', patient.occupation);
+          setVal('input[name="company"]', patient.company);
+          setVal('input[name="emergencyContactName"]', patient.emergency_contact_name);
+          setVal('input[name="emergencyContactPhone"]', patient.emergency_contact_phone);
+          
+          // Campos médicos
+          setVal('textarea[name="allergies"]', patient.allergies);
+          setVal('textarea[name="medications"]', patient.medications);
+          setVal('textarea[name="medicalConditions"]', patient.medical_conditions);
+        } catch (formError) {
+          console.error('Error populating basic form fields:', formError);
         }
 
-        (document.querySelector('select[name="gender"]') as HTMLSelectElement).value = patient.gender || '';
-        (document.querySelector('select[name="bloodType"]') as HTMLSelectElement).value = patient.blood_type || '';
-        (document.querySelector('textarea[name="address"]') as HTMLTextAreaElement).value = patient.address || '';
-        (document.querySelector('input[name="occupation"]') as HTMLInputElement).value = patient.occupation || '';
-        (document.querySelector('input[name="company"]') as HTMLInputElement).value = patient.company || '';
-        (document.querySelector('input[name="emergencyContactName"]') as HTMLInputElement).value = patient.emergency_contact_name || '';
-        (document.querySelector('input[name="emergencyContactPhone"]') as HTMLInputElement).value = patient.emergency_contact_phone || '';
-        (document.querySelector('textarea[name="allergies"]') as HTMLTextAreaElement).value = patient.allergies || '';
-        (document.querySelector('textarea[name="medications"]') as HTMLTextAreaElement).value = patient.medications || '';
-        (document.querySelector('textarea[name="medicalConditions"]') as HTMLTextAreaElement).value = patient.medical_conditions || '';
-
-        // Cargar empresas y preseleccionar la del paciente si existe
-        await loadCompaniesIntoSelect(patient.company_id ? String(patient.company_id) : '');
-        const companySelectEl = document.querySelector('select[name="companyId"]') as HTMLSelectElement | null;
-        if (companySelectEl) {
-          companySelectEl.value = patient.company_id ? String(patient.company_id) : '';
-        }
-        syncCompanyInputState();
-
-        // Gestionar firma
-        currentSignatureBlob = null;
-        if (patient.signature_path) {
-          // Si tiene firma, mostrarla
-          showExistingSignature(patient.signature_path);
-        } else {
-          // Si no tiene firma, mostrar el pad
-          showNewSignaturePad();
+        try {
+          console.log('Handling company selection...');
+          // Cargar empresas y preseleccionar la del paciente si existe
+          await loadCompaniesIntoSelect(patient.company_id ? String(patient.company_id) : '');
+          const companySelectEl = document.querySelector('select[name="companyId"]') as HTMLSelectElement | null;
+          if (companySelectEl) {
+            companySelectEl.value = patient.company_id ? String(patient.company_id) : '';
+          }
+          syncCompanyInputState();
+        } catch (companyError) {
+          console.error('Error handling company selection:', companyError);
         }
 
+        try {
+          console.log('Handling media (photo/signature)...');
+          // Gestionar Foto
+          photoFile = null;
+          deletePhoto = false;
+          if (patient.photo_path) {
+              if (photoPreview && photoPlaceholder && removePhotoBtn) {
+                  photoPreview.src = patient.photo_path;
+                  photoPreview.classList.remove('hidden');
+                  photoPlaceholder.classList.add('hidden');
+                  removePhotoBtn.classList.remove('hidden');
+              }
+          } else {
+              if (photoPreview && photoPlaceholder && removePhotoBtn) {
+                  photoPreview.src = '';
+                  photoPreview.classList.add('hidden');
+                  photoPlaceholder.classList.remove('hidden');
+                  removePhotoBtn.classList.add('hidden');
+              }
+          }
+
+          // Gestionar firma
+          currentSignatureBlob = null;
+          signatureFile = null;
+          switchSignatureMode('draw');
+          
+          if (patient.signature_path) {
+            // Si tiene firma, mostrarla
+            showExistingSignature(patient.signature_path);
+          } else {
+            // Si no tiene firma, mostrar el pad
+            showNewSignaturePad();
+          }
+        } catch (mediaError) {
+          console.error('Error handling media (photo/signature):', mediaError);
+        }
+
+        console.log('Opening modal...');
         // Cambiar el título del modal y agregar el ID del paciente
-        document.getElementById('modalTitle')!.textContent = 'Editar Paciente';
-        patientForm.dataset.patientId = id.toString();
+        const modalTitle = document.getElementById('modalTitle');
+        if (modalTitle) modalTitle.textContent = 'Editar Paciente';
+        
+        if (patientForm) patientForm.dataset.patientId = id.toString();
 
         // Abrir modal
-        modal.classList.remove('hidden');
+        if (modal) {
+          modal.classList.remove('hidden');
+        } else {
+          console.error('Modal element not found');
+          showAlert('error', 'Error', 'Error interno: No se pudo abrir el modal');
+        }
       } else {
-        showAlert('error', 'Error', 'No se pudo cargar la información del paciente');
+        console.error('API returned success:false or no data', result);
+        showAlert('error', 'Error', result.message || 'No se pudo cargar la información del paciente');
       }
     } catch (error) {
-      showAlert('error', 'Error', 'Error al cargar datos del paciente');
+      console.error('Error loading patient data (full stack):', error);
+      showAlert('error', 'Error', 'Error al cargar datos del paciente: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 

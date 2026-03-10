@@ -63,10 +63,24 @@ const { className = "" } = Astro.props;
       (window as any).signaturePad = {
         clearSignature: () => this.clear(),
         resize: () => this.resizeCanvas(),
-        isEmpty: () => !this.hasSignature
+        isEmpty: () => !this.hasSignature,
+        save: () => this.save(),
+        getBlob: () => this.getBlob()
       };
       
       window.addEventListener('resize', () => this.resizeCanvas());
+    }
+
+    getBlob(): Promise<Blob | null> {
+      return new Promise((resolve) => {
+        if (!this.hasSignature) {
+          resolve(null);
+          return;
+        }
+        this.canvas.toBlob((blob) => {
+          resolve(blob);
+        }, 'image/png');
+      });
     }
 
     private resizeCanvas() {

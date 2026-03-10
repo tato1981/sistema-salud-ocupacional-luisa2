@@ -88,7 +88,19 @@ if (!patientId) {
           <div class="px-6 py-4 border-b border-gray-200">
             <h2 class="text-lg font-medium text-gray-900">Información Personal</h2>
           </div>
-          <div class="p-6">
+          <div class="p-6 flex flex-col md:flex-row gap-6">
+            <!-- Foto de Perfil -->
+            <div class="flex-shrink-0 flex justify-center md:justify-start">
+              <div class="relative">
+                <img id="patientPhoto" src="" alt="Foto de perfil" class="w-32 h-32 rounded-full object-cover border-4 border-gray-100 shadow-sm bg-gray-100 hidden">
+                <div id="patientPhotoPlaceholder" class="w-32 h-32 rounded-full border-4 border-gray-100 shadow-sm bg-gray-100 flex items-center justify-center text-gray-400">
+                  <svg class="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
             <!-- Información Personal -->
             <div class="flex-1">
                 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -193,6 +205,18 @@ if (!patientId) {
             </div>
           </div>
         </div>
+        <!-- Firma del Paciente -->
+        <div id="signatureCard" class="bg-white rounded-lg shadow mb-6 hidden">
+          <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Firma Registrada</h2>
+          </div>
+          <div class="p-6 flex justify-center items-center bg-gray-50 rounded-b-lg">
+            <div class="bg-white p-4 rounded border border-gray-200 shadow-sm">
+              <img id="patientSignature" src="" alt="Firma del paciente" class="max-h-32 object-contain" />
+            </div>
+          </div>
+        </div>
+
         <!-- Appointments History Card -->
         <div id="appointments" class="bg-white rounded-lg shadow">
           <div class="px-6 py-4 border-b border-gray-200">
@@ -342,6 +366,30 @@ if (!patientId) {
     document.getElementById('patientBloodType')!.textContent = patient.blood_type || '-';
     document.getElementById('patientAge')!.textContent = calculateAge(patient.date_of_birth) + ' años';
     document.getElementById('patientAddress')!.textContent = patient.address || '-';
+    
+    // Foto de perfil
+    const photoImg = document.getElementById('patientPhoto') as HTMLImageElement;
+    const photoPlaceholder = document.getElementById('patientPhotoPlaceholder');
+    
+    if (patient.photo_path) {
+      photoImg.src = patient.photo_path;
+      photoImg.classList.remove('hidden');
+      photoPlaceholder?.classList.add('hidden');
+    } else {
+      photoImg.classList.add('hidden');
+      photoPlaceholder?.classList.remove('hidden');
+    }
+
+    // Firma
+    const signatureCard = document.getElementById('signatureCard');
+    const signatureImg = document.getElementById('patientSignature') as HTMLImageElement;
+
+    if (patient.signature_path) {
+      signatureImg.src = patient.signature_path;
+      signatureCard?.classList.remove('hidden');
+    } else {
+      signatureCard?.classList.add('hidden');
+    }
     
     // Información laboral
     document.getElementById('patientCompany')!.textContent = patient.company || '-';

@@ -30,10 +30,10 @@ export class PatientService {
     createdBy: number;
   }): Promise<{ success: boolean; message: string; patient?: any }> {
     try {
-      console.log('🏥 PatientService.createPatient - Iniciando...');
-      console.log('📋 Datos recibidos:', JSON.stringify(patientData, null, 2));
-      console.log('🔍 documentNumber:', patientData.documentNumber);
-      console.log('🏢 Company Info - ID:', patientData.companyId, 'Text:', patientData.company);
+      // console.log('🏥 PatientService.createPatient - Iniciando...');
+      // console.log('📋 Datos recibidos:', JSON.stringify(patientData, null, 2));
+      // console.log('🔍 documentNumber:', patientData.documentNumber);
+      // console.log('🏢 Company Info - ID:', patientData.companyId, 'Text:', patientData.company);
       
       // Verificar si ya existe un paciente con ese documento
       const [existing] = await db.execute(
@@ -49,7 +49,7 @@ export class PatientService {
       }
 
       // Verificar si existe el campo identification_number en la tabla
-      console.log('🔍 Verificando estructura de tabla...');
+      // console.log('🔍 Verificando estructura de tabla...');
       const [tableStructure] = await db.execute(
         "SHOW COLUMNS FROM patients WHERE Field LIKE '%document%' OR Field LIKE '%identification%'"
       );
@@ -58,13 +58,13 @@ export class PatientService {
         col => col.Field === 'identification_number'
       );
       
-      console.log(`📋 Campo identification_number existe: ${hasIdentificationNumber ? '✅ SÍ' : '❌ NO'}`);
+      // console.log(`📋 Campo identification_number existe: ${hasIdentificationNumber ? '✅ SÍ' : '❌ NO'}`);
 
       // Construir query dinámicamente basado en la estructura de la tabla
       let query, values;
       
       if (hasIdentificationNumber) {
-        console.log('📝 Insertando en ambos campos (document_number e identification_number)');
+        // console.log('📝 Insertando en ambos campos (document_number e identification_number)');
         query = `
           INSERT INTO patients (
             name, email, phone, document_type, document_number, identification_number,
@@ -98,7 +98,7 @@ export class PatientService {
           patientData.createdBy
         ];
       } else {
-        console.log('📝 Insertando solo en document_number');
+        // console.log('📝 Insertando solo en document_number');
         query = `
           INSERT INTO patients (
             name, email, phone, document_type, document_number, date_of_birth,
@@ -132,13 +132,13 @@ export class PatientService {
         ];
       }
       
-      console.log('💾 Ejecutando query:', query);
-      console.log('📝 Valores:', values);
+      // console.log('💾 Ejecutando query:', query);
+      // console.log('📝 Valores:', values);
 
       const [result] = await db.execute(query, values);
 
       const patientId = (result as any).insertId;
-      console.log('✅ Paciente insertado con ID:', patientId);
+      // console.log('✅ Paciente insertado con ID:', patientId);
 
       return {
         success: true,
