@@ -69,7 +69,6 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
                 type="date" 
                 name="appointmentDate" 
                 required 
-                min="{new Date().toISOString().split('T')[0]}"
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -344,17 +343,23 @@ if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
     const selectedDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
     const now = new Date();
     
-    // Validar que la fecha/hora sea futura (al menos 30 minutos desde ahora)
-    const minFutureTime = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutos
-    
-    if (selectedDateTime <= minFutureTime) {
-      Swal.fire({
+    // Validar si la fecha es pasada
+    if (selectedDateTime < now) {
+      const result = await Swal.fire({
         icon: 'warning',
-        title: 'Fecha inválida',
-        text: 'La cita debe programarse al menos 30 minutos en el futuro',
-        footer: `Hora actual: ${now.toLocaleString('es-ES')}`
+        title: 'Fecha en el pasado',
+        text: 'Ha seleccionado una fecha y hora anterior al momento actual. ¿Desea continuar y agendar la cita en el pasado?',
+        footer: `Hora actual: ${now.toLocaleString('es-ES')}`,
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Sí, agendar',
+        cancelButtonText: 'Cancelar'
       });
-      return;
+
+      if (!result.isConfirmed) {
+        return;
+      }
     }
 
     // Validar horario laboral (7:00 AM a 6:00 PM)
