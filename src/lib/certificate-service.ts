@@ -3,6 +3,9 @@ import { getBaseUrl } from './utils.js';
 import dayjs from 'dayjs';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
+import fs from 'fs';
+import path from 'path';
+import sharp from 'sharp';
 
 export type AptitudeStatus = 'apto' | 'apto_con_restricciones' | 'apto_manipulacion_alimentos' | 'apto_trabajo_alturas' | 'apto_espacios_confinados' | 'apto_conduccion';
 
@@ -127,6 +130,52 @@ export class CertificateService {
     );
     const arr = rows as any[];
     return arr.length > 0 ? arr[0] : null;
+  }
+
+  private static resolvePublicPath(relativePath: string): string {
+    if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
+        return relativePath;
+    }
+
+    const cleanPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+
+    const possiblePaths = [
+      path.join(process.cwd(), cleanPath),
+      path.join(process.cwd(), 'dist', 'client', cleanPath),
+      path.join(process.cwd(), 'public', cleanPath),
+    ];
+
+    for (const possiblePath of possiblePaths) {
+      if (fs.existsSync(possiblePath)) {
+        return possiblePath;
+      }
+    }
+
+    return possiblePaths[0];
+  }
+
+  private static async convertImageForPDF(imagePath: string): Promise<Buffer | null> {
+    try {
+      let inputBuffer: Buffer;
+
+      if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+          const response = await fetch(imagePath);
+          if (!response.ok) return null;
+          const arrayBuffer = await response.arrayBuffer();
+          inputBuffer = Buffer.from(arrayBuffer);
+      } else {
+          if (!fs.existsSync(imagePath)) return null;
+          inputBuffer = fs.readFileSync(imagePath);
+      }
+
+      return await sharp(inputBuffer)
+        .flatten({ background: { r: 255, g: 255, b: 255 } })
+        .jpeg({ quality: 80 })
+        .toBuffer();
+    } catch (error) {
+      console.error('Error converting image:', error);
+      return null;
+    }
   }
 
   static async issueCertificate(params: IssueCertificateParams): Promise<{ success: boolean; message?: string; certificateId?: number; pdfBuffer?: Buffer; verificationUrl?: string; }>{
@@ -308,8 +357,8 @@ export class CertificateService {
       // Tipo de cita (si existe)
       if (appointmentInfo?.appointment_type) {
         doc.moveDown(0.2);
-        /* Fecha de examen eliminada por solicitud */
-        /*
+        
+        // Fecha de examen (Cita)
         if (appointmentInfo.appointment_date) {
           doc.font('Helvetica').fontSize(8).text(
             cleanText(`Fecha de examen: ${dayjs(appointmentInfo.appointment_date).format('DD/MM/YYYY')}`),
@@ -317,7 +366,7 @@ export class CertificateService {
           );
           doc.moveDown(0.1);
         }
-        */
+        
         const appointmentTypeMap: Record<string, string> = {
           'examen_periodico': 'Examen Médico Periódico',
           'examen_ingreso': 'Examen de Ingreso',
@@ -443,16 +492,52 @@ export class CertificateService {
 
       // Firma Izquierda: Profesional
       doc.font('Helvetica').fontSize(8);
-      doc.text('____________________________', 60, signatureY);
-      doc.text(cleanText(doctor.name), 60, signatureY + 15);
-      doc.text(cleanText(`C.C. ${doctor.document_number || 'N/A'}`), 60, signatureY + 28);
-      doc.text(cleanText(`Registro No: ${doctor.professional_license || 'N/A'}`), 60, signatureY + 41);
+      
+      let doctorTextY = signatureY + 15;
+      
+      if (doctor.signature_path) {
+         try {
+           const signBuffer = await this.convertImageForPDF(this.resolvePublicPath(doctor.signature_path));
+           if (signBuffer) {
+              doc.image(signBuffer, 60, signatureY - 10, { width: 150, height: 40, align: 'left' });
+              doctorTextY = signatureY + 35;
+           } else {
+              doc.text('____________________________', 60, signatureY);
+           }
+         } catch (e) {
+            doc.text('____________________________', 60, signatureY);
+         }
+      } else {
+         doc.text('____________________________', 60, signatureY);
+      }
+      
+      doc.text(cleanText(doctor.name), 60, doctorTextY);
+      doc.text(cleanText(`C.C. ${doctor.document_number || 'N/A'}`), 60, doctorTextY + 13);
+      doc.text(cleanText(`Registro No: ${doctor.professional_license || 'N/A'}`), 60, doctorTextY + 26);
       
       // Firma Derecha: Firma del Paciente
       const rightSigX = fullPageWidth - 250;
-      doc.text(cleanText(patient.name), rightSigX, signatureY + 15);
-      doc.text(cleanText(`${patient.document_type || 'C.C.'} ${patient.document_number || 'N/A'}`), rightSigX, signatureY + 28);
-      doc.text(cleanText('Paciente'), rightSigX, signatureY + 41);
+      let patientTextY = signatureY + 15;
+      
+      if (patient.signature_path) {
+         try {
+           const signBuffer = await this.convertImageForPDF(this.resolvePublicPath(patient.signature_path));
+           if (signBuffer) {
+              doc.image(signBuffer, rightSigX, signatureY - 10, { width: 150, height: 40, align: 'left' });
+              patientTextY = signatureY + 35;
+           } else {
+              doc.text('____________________________', rightSigX, signatureY);
+           }
+         } catch (e) {
+            doc.text('____________________________', rightSigX, signatureY);
+         }
+      } else {
+         doc.text('____________________________', rightSigX, signatureY);
+      }
+
+      doc.text(cleanText(patient.name), rightSigX, patientTextY);
+      doc.text(cleanText(`${patient.document_type || 'C.C.'} ${patient.document_number || 'N/A'}`), rightSigX, patientTextY + 13);
+      doc.text(cleanText('Paciente'), rightSigX, patientTextY + 26);
 
       // Código QR y verificación (ahora debajo de las firmas)
       doc.y = signatureY + 110;
@@ -633,14 +718,14 @@ export class CertificateService {
 
       if (record.appointment_type) {
         doc.moveDown(0.2);
-        /* Fecha de examen eliminada por solicitud */
-        /*
+        
+        // Fecha de examen (Cita)
         const examDateSource = record.appointment_date || record.certificate_date || record.created_at;
         if (examDateSource) {
           doc.font('Helvetica').fontSize(8).text(cleanText(`Fecha de examen: ${dayjs(examDateSource).format('DD/MM/YYYY')}`), 60);
           doc.moveDown(0.1);
         }
-        */
+        
         const appointmentTypeMap: Record<string, string> = {
           'examen_periodico': 'Examen Médico Periódico',
           'examen_ingreso': 'Examen de Ingreso',
@@ -760,16 +845,52 @@ export class CertificateService {
 
       // Firma Izquierda: Profesional
       doc.font('Helvetica').fontSize(8);
-      doc.text('____________________________', 60, signatureY);
-      doc.text(cleanText(doctor?.name || ''), 60, signatureY + 15);
-      doc.text(cleanText(`C.C. ${doctor?.document_number || 'N/A'}`), 60, signatureY + 28);
-      doc.text(cleanText(`Registro No: ${doctor?.professional_license || 'N/A'}`), 60, signatureY + 41);
+      
+      let doctorTextY = signatureY + 15;
+
+      if (doctor && doctor.signature_path) {
+         try {
+           const signBuffer = await this.convertImageForPDF(this.resolvePublicPath(doctor.signature_path));
+           if (signBuffer) {
+              doc.image(signBuffer, 60, signatureY - 10, { width: 150, height: 40, align: 'left' });
+              doctorTextY = signatureY + 35;
+           } else {
+              doc.text('____________________________', 60, signatureY);
+           }
+         } catch (e) {
+            doc.text('____________________________', 60, signatureY);
+         }
+      } else {
+         doc.text('____________________________', 60, signatureY);
+      }
+      
+      doc.text(cleanText(doctor?.name || ''), 60, doctorTextY);
+      doc.text(cleanText(`C.C. ${doctor?.document_number || 'N/A'}`), 60, doctorTextY + 13);
+      doc.text(cleanText(`Registro No: ${doctor?.professional_license || 'N/A'}`), 60, doctorTextY + 26);
 
       // Firma Derecha: Firma del Paciente
       const rightSigX = fullPageWidth - 250;
-      doc.text(cleanText(patient?.name || ''), rightSigX, signatureY + 15);
-      doc.text(cleanText(`${patient?.document_type || 'C.C.'} ${patient?.document_number || 'N/A'}`), rightSigX, signatureY + 28);
-      doc.text(cleanText('Paciente'), rightSigX, signatureY + 41);
+      let patientTextY = signatureY + 15;
+      
+      if (patient && patient.signature_path) {
+         try {
+           const signBuffer = await this.convertImageForPDF(this.resolvePublicPath(patient.signature_path));
+           if (signBuffer) {
+              doc.image(signBuffer, rightSigX, signatureY - 10, { width: 150, height: 40, align: 'left' });
+              patientTextY = signatureY + 35;
+           } else {
+              doc.text('____________________________', rightSigX, signatureY);
+           }
+         } catch (e) {
+            doc.text('____________________________', rightSigX, signatureY);
+         }
+      } else {
+         doc.text('____________________________', rightSigX, signatureY);
+      }
+      
+      doc.text(cleanText(patient?.name || ''), rightSigX, patientTextY);
+      doc.text(cleanText(`${patient?.document_type || 'C.C.'} ${patient?.document_number || 'N/A'}`), rightSigX, patientTextY + 13);
+      doc.text(cleanText('Paciente'), rightSigX, patientTextY + 26);
 
       // Código QR y verificación (ahora debajo de las firmas)
       doc.y = signatureY + 110;

@@ -692,6 +692,7 @@ export class MedicalHistoryService {
       }
 
       return await sharp(inputBuffer)
+        .flatten({ background: { r: 255, g: 255, b: 255 } })
         .jpeg({ quality: 80 })
         .toBuffer();
     } catch (error) {
@@ -742,7 +743,9 @@ export class MedicalHistoryService {
       doc.y = infoBoxY + 12;
       
       doc.font('Helvetica-Bold').fontSize(9).text(cleanText('FECHA DE CONSULTA:'), 70, doc.y);
-      doc.font('Helvetica').fontSize(10).text(cleanText(dayjs(history.created_at).format('DD/MM/YYYY HH:mm')), 180, doc.y);
+      // Usar fecha de la cita si existe, de lo contrario la fecha de creación
+      const consultationDate = history.appointment_date || history.created_at;
+      doc.font('Helvetica').fontSize(10).text(cleanText(dayjs(consultationDate).format('DD/MM/YYYY HH:mm')), 180, doc.y);
       
       if (history.appointment_type) {
          doc.font('Helvetica-Bold').fontSize(9).text(cleanText('TIPO DE CONSULTA:'), 300, doc.y);

@@ -76,9 +76,11 @@ try {
     const [editRows] = await db.execute(`
       SELECT 
         mh.*,
-        u.name as doctor_name
+        u.name as doctor_name,
+        a.appointment_date
       FROM medical_histories mh
       LEFT JOIN users u ON mh.doctor_id = u.id
+      LEFT JOIN appointments a ON mh.appointment_id = a.id
       WHERE mh.id = ? AND mh.patient_id = ?
     `, [editHistoryId, patientId]);
 
@@ -190,7 +192,7 @@ if (editingHistory) {
               </h1>
               <p class="text-sm text-gray-600">
                 Paciente: {patient.name}
-                {editingHistory && ` - Editando consulta del ${new Date(editingHistory.created_at).toLocaleDateString('es-ES')}`}
+                {editingHistory && ` - Editando consulta del ${new Date(editingHistory.appointment_date || editingHistory.created_at).toLocaleDateString('es-ES')}`}
               </p>
             </div>
           </div>
@@ -279,7 +281,7 @@ if (editingHistory) {
                   <div class="flex justify-between items-start mb-4">
                     <div>
                       <h3 class="text-lg font-semibold text-gray-900">
-                        Consulta del {new Date(history.created_at).toLocaleDateString('es-ES', {
+                        Consulta del {new Date(history.appointment_date || history.created_at).toLocaleDateString('es-ES', {
                           year: 'numeric',
                           month: 'long',
                           day: 'numeric'
@@ -393,7 +395,7 @@ if (editingHistory) {
                   type="datetime-local" 
                   name="consultation_date" 
                   id="consultation_date"
-                  value={editingHistory ? toLocalISOString(new Date(editingHistory.created_at)) : (prefillData.created_at ? toLocalISOString(new Date(prefillData.created_at)) : toLocalISOString(new Date()))}
+                  value={editingHistory ? toLocalISOString(new Date(editingHistory.appointment_date || editingHistory.created_at)) : (prefillData.created_at ? toLocalISOString(new Date(prefillData.created_at)) : toLocalISOString(new Date()))}
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
@@ -1012,7 +1014,7 @@ if (editingHistory) {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
                     <span class="font-medium text-gray-700">Fecha:</span>
-                    ${new Date(history.created_at).toLocaleDateString('es-ES', {
+                    ${new Date(history.appointment_date || history.created_at).toLocaleDateString('es-ES', {
                       year: 'numeric',
                       month: 'long', 
                       day: 'numeric',
