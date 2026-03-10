@@ -249,9 +249,24 @@ import Layout from "../../layouts/Layout.astro";
       const status = statusMap[cert.aptitude_status] || { text: cert.aptitude_status, color: 'text-gray-700 bg-gray-100' };
       
       const statusInfo = document.getElementById('statusInfo');
-      const createdDate = cert.created_at ? new Date(cert.created_at).toLocaleDateString('es-ES') : 'N/A';
-      const validityStart = cert.validity_start ? new Date(cert.validity_start).toLocaleDateString('es-ES') : null;
-      const validityEnd = cert.validity_end ? new Date(cert.validity_end).toLocaleDateString('es-ES') : null;
+      // Usar validity_start como fecha de emisión si existe, para coincidir con el PDF y la lógica de negocio
+      const emissionDateSource = cert.validity_start || cert.created_at;
+      // Ajustar la fecha para evitar problemas de zona horaria (las fechas vienen en UTC o string YYYY-MM-DD)
+      // Si es solo fecha YYYY-MM-DD, añadir T12:00:00 para asegurar el mismo día
+      const adjustDate = (dateStr) => {
+        if (!dateStr) return null;
+        if (dateStr.includes('T')) return new Date(dateStr);
+        return new Date(dateStr + 'T12:00:00');
+      };
+
+      const createdDateObj = adjustDate(emissionDateSource);
+      const createdDate = createdDateObj ? createdDateObj.toLocaleDateString('es-ES') : 'N/A';
+      
+      const validityStartObj = adjustDate(cert.validity_start);
+      const validityStart = validityStartObj ? validityStartObj.toLocaleDateString('es-ES') : null;
+      
+      const validityEndObj = adjustDate(cert.validity_end);
+      const validityEnd = validityEndObj ? validityEndObj.toLocaleDateString('es-ES') : null;
 
       // Mapeo de tipos de cita
       const appointmentTypeMap = {
