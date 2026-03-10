@@ -59,7 +59,6 @@ export const GET: APIRoute = async ({ params, cookies }) => {
     });
 
   } catch (error) {
-    console.error('Error en GET /api/doctor/patients/[id]/appointments:', error);
     return new Response(JSON.stringify({
       success: false,
       message: 'Error interno del servidor'

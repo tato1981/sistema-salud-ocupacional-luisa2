@@ -198,6 +198,12 @@ export class CertificateService {
       // Generar código de verificación único
       const verificationCode = generateCode(32);
 
+      // Asegurar que la fecha de inicio de vigencia sea la fecha actual si no se proporciona
+      // Esto garantiza que la fecha de emisión sea igual a la fecha de inicio de vigencia
+      if (!params.validityStart) {
+        params.validityStart = dayjs().format('YYYY-MM-DD');
+      }
+
       // Insertar registro de certificado
       const [result] = await db.execute(
         `INSERT INTO work_certificates (
@@ -357,15 +363,6 @@ export class CertificateService {
       // Tipo de cita (si existe)
       if (appointmentInfo?.appointment_type) {
         doc.moveDown(0.2);
-        
-        // Fecha de examen (Cita)
-        if (appointmentInfo.appointment_date) {
-          doc.font('Helvetica').fontSize(8).text(
-            cleanText(`Fecha de examen: ${dayjs(appointmentInfo.appointment_date).format('DD/MM/YYYY')}`),
-            60
-          );
-          doc.moveDown(0.1);
-        }
         
         const appointmentTypeMap: Record<string, string> = {
           'examen_periodico': 'Examen Médico Periódico',
@@ -718,13 +715,6 @@ export class CertificateService {
 
       if (record.appointment_type) {
         doc.moveDown(0.2);
-        
-        // Fecha de examen (Cita)
-        const examDateSource = record.appointment_date || record.certificate_date || record.created_at;
-        if (examDateSource) {
-          doc.font('Helvetica').fontSize(8).text(cleanText(`Fecha de examen: ${dayjs(examDateSource).format('DD/MM/YYYY')}`), 60);
-          doc.moveDown(0.1);
-        }
         
         const appointmentTypeMap: Record<string, string> = {
           'examen_periodico': 'Examen Médico Periódico',
