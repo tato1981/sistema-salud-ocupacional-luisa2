@@ -276,12 +276,21 @@ if (!user || user.role !== 'admin') {
         document.getElementById('modalAppointmentId').value = app.id;
         document.getElementById('modalPatientName').value = app.patient_name;
         
-        // Default dates
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('modalStart').value = today;
-        const nextYear = new Date();
+        // Helper to format date as YYYY-MM-DD in local time
+        const formatDateLocal = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        // Default dates using local time
+        const now = new Date();
+        document.getElementById('modalStart').value = formatDateLocal(now);
+        
+        const nextYear = new Date(now);
         nextYear.setFullYear(nextYear.getFullYear() + 1);
-        document.getElementById('modalEnd').value = nextYear.toISOString().split('T')[0];
+        document.getElementById('modalEnd').value = formatDateLocal(nextYear);
 
         document.getElementById('issueModal').classList.remove('hidden');
     }

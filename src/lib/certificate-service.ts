@@ -18,6 +18,7 @@ export interface IssueCertificateParams {
   recommendations?: string;
   validityStart?: string; // YYYY-MM-DD
   validityEnd?: string;   // YYYY-MM-DD
+  baseUrl?: string;
 }
 
 function generateCode(length = 32): string {
@@ -224,7 +225,8 @@ export class CertificateService {
       );
 
       const certificateId = (result as any).insertId as number;
-      const verificationUrl = `${getBaseUrl()}/certificates/verify?code=${encodeURIComponent(verificationCode)}`;
+      const baseUrl = params.baseUrl || getBaseUrl();
+      const verificationUrl = `${baseUrl}/certificates/verify?code=${encodeURIComponent(verificationCode)}`;
 
       // Actualizar medical_histories con el aptitude_status del certificado
       try {

@@ -1,8 +1,9 @@
 import type { APIRoute } from 'astro';
-import { CertificateService } from '../../../lib/certificate-service.js';
+import { CertificateService } from '@/lib/certificate-service';
 
 export const GET: APIRoute = async ({ url }) => {
   try {
+    console.log('Verifying certificate...');
     const code = new URL(url).searchParams.get('code');
     if (!code) {
       return new Response(JSON.stringify({ success: false, message: 'code es requerido' }), {

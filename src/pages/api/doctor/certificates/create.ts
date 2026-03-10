@@ -118,6 +118,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
     const signingDoctorId = appt.doctor_id; // el médico que atendió la cita
 
+    // Obtener el origen de la solicitud para generar URLs correctas en el QR
+    const origin = new URL(request.url).origin;
+
     // Emitir certificado firmado por el médico de la cita (no por el admin)
     console.log('🏥 Iniciando emisión de certificado...');
     const result = await CertificateService.issueCertificate({
@@ -128,7 +131,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       restrictions: restrictions || undefined,
       recommendations: recommendations || undefined,
       validityStart: validity_start || undefined,
-      validityEnd: validity_end || undefined
+      validityEnd: validity_end || undefined,
+      baseUrl: origin
     });
     console.log('✅ Certificado emitido exitosamente');
 

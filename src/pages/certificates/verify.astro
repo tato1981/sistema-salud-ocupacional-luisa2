@@ -235,23 +235,101 @@ import Layout from "../../layouts/Layout.astro";
       showLoading(true);
       
       try {
-        const response = await fetch(`/api/certificates/verify?code=${encodeURIComponent(code)}`);
-        const data = await response.json();
+        const fetchUrl = `/api/certificates/verify?code=${encodeURIComponent(code)}`;
+        console.log('Fetching:', fetchUrl);
+        const response = await fetch(fetchUrl);
+        
+        if (!response.ok) {
+           console.error('API Error:', response.status, response.statusText);
+           const text = await response.text();
+           console.error('API Response Body:', text);
+           try {
+             const data = JSON.parse(text);
+             showError(data.message || `Error del servidor: ${response.status}`, `Status: ${response.status}\nBody: ${text}`);
+             return;
+           } catch (e) {
+             showError(`Error del servidor (${response.status}). Por favor contacte soporte.`, `Status: ${response.status}\nBody: ${text}\nParse Error: ${e.message}`);
+             return;
+           }
+        }
+
+        let data;
+        try {
+          const text = await response.text();
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+             console.error('Invalid JSON response:', text);
+             showError('Error en la respuesta del servidor. Por favor contacte soporte.', `Invalid JSON: ${text}`);
+             return;
+          }
+        } catch (e) {
+           console.error('Error reading response:', e);
+           showError('Error de comunicación con el servidor.', e.message);
+           return;
+        }
         
         showLoading(false);
         
         if (data.success && data.data) {
           displayCertificate(data.data, code);
         } else {
-          showError(data.message || 'Certificado no encontrado');
+          showError(data.message || 'Certificado no encontrado', JSON.stringify(data));
         }
       } catch (error) {
         showLoading(false);
-        showError('Error al verificar el certificado. Verifica tu conexión.');
+        console.error('Error verifying certificate:', error);
+        showError(`Error de conexión: ${error.message || 'No se pudo contactar al servidor'}`, error.stack || error.message);
       }
     }
 
     function displayCertificate(cert, code) {
+      // Preparar datos y fechas antes de renderizar
+      const adjustDate = (dateStr) => {
+        if (!dateStr) return null;
+        if (typeof dateStr === 'string') {
+          const datePart = dateStr.split('T')[0];
+          return new Date(datePart + 'T12:00:00');
+        }
+        return new Date(dateStr);
+      };
+
+      const emissionDateSource = cert.validity_start || cert.created_at;
+      const createdDateObj = adjustDate(emissionDateSource);
+      const createdDate = createdDateObj ? createdDateObj.toLocaleDateString('es-ES') : 'N/A';
+      
+      const validityStartObj = adjustDate(cert.validity_start);
+      const validityStart = validityStartObj ? validityStartObj.toLocaleDateString('es-ES') : null;
+      
+      const validityEndObj = adjustDate(cert.validity_end);
+      const validityEnd = validityEndObj ? validityEndObj.toLocaleDateString('es-ES') : null;
+
+      const dobObj = adjustDate(cert.date_of_birth);
+      const dobDate = dobObj ? dobObj.toLocaleDateString('es-ES') : '';
+
+      const statusMap = {
+        'apto': { text: 'APTO PARA EL TRABAJO', color: 'text-green-700 bg-green-100' },
+        'apto_con_restricciones': { text: 'APTO CON RESTRICCIONES', color: 'text-yellow-700 bg-yellow-100' },
+        'apto_manipulacion_alimentos': { text: 'APTO PARA MANIPULACIÓN DE ALIMENTOS', color: 'text-blue-700 bg-blue-100' },
+        'apto_trabajo_alturas': { text: 'APTO PARA TRABAJO EN ALTURAS', color: 'text-purple-700 bg-purple-100' },
+        'apto_espacios_confinados': { text: 'APTO PARA ESPACIOS CONFINADOS', color: 'text-indigo-700 bg-indigo-100' },
+        'apto_conduccion': { text: 'APTO PARA CONDUCCIÓN', color: 'text-teal-700 bg-teal-100' }
+      };
+      
+      const status = statusMap[cert.aptitude_status] || { text: cert.aptitude_status, color: 'text-gray-700 bg-gray-100' };
+
+      const appointmentTypeMap = {
+        'examen_periodico': 'Examen Médico Periódico',
+        'examen_ingreso': 'Examen de Ingreso',
+        'examen_egreso': 'Examen de Egreso',
+        'examen_reintegro': 'Examen de Reintegro',
+        'consulta_general': 'Consulta General',
+        'consulta_especializada': 'Consulta Especializada',
+        'seguimiento': 'Seguimiento',
+        'urgencias': 'Urgencias'
+      };
+      const appointmentTypeText = cert.appointment_type ? (appointmentTypeMap[cert.appointment_type] || cert.appointment_type) : null;
+
       // Mostrar resultado
       document.getElementById('result').classList.remove('hidden');
       
@@ -283,7 +361,7 @@ import Layout from "../../layouts/Layout.astro";
         ${cert.date_of_birth ? `
         <div class="flex justify-between py-2 border-b border-gray-100">
           <span class="font-medium text-gray-700">Fecha de nacimiento:</span>
-          <span class="text-gray-900">${new Date(cert.date_of_birth).toLocaleDateString('es-ES')}</span>
+          <span class="text-gray-900">${dobDate}</span>
         </div>` : ''}
         ${cert.company ? `
         <div class="flex justify-between py-2 border-b border-gray-100">
@@ -297,50 +375,7 @@ import Layout from "../../layouts/Layout.astro";
         </div>` : ''}
       `;
 
-      // Mostrar estado y vigencia
-      const statusMap = {
-        'apto': { text: 'APTO PARA EL TRABAJO', color: 'text-green-700 bg-green-100' },
-        'apto_con_restricciones': { text: 'APTO CON RESTRICCIONES', color: 'text-yellow-700 bg-yellow-100' },
-        'apto_manipulacion_alimentos': { text: 'APTO PARA MANIPULACIÓN DE ALIMENTOS', color: 'text-blue-700 bg-blue-100' },
-        'apto_trabajo_alturas': { text: 'APTO PARA TRABAJO EN ALTURAS', color: 'text-purple-700 bg-purple-100' },
-        'apto_espacios_confinados': { text: 'APTO PARA ESPACIOS CONFINADOS', color: 'text-indigo-700 bg-indigo-100' },
-        'apto_conduccion': { text: 'APTO PARA CONDUCCIÓN', color: 'text-teal-700 bg-teal-100' }
-      };
-      
-      const status = statusMap[cert.aptitude_status] || { text: cert.aptitude_status, color: 'text-gray-700 bg-gray-100' };
-      
       const statusInfo = document.getElementById('statusInfo');
-      // Usar validity_start como fecha de emisión si existe, para coincidir con el PDF y la lógica de negocio
-      const emissionDateSource = cert.validity_start || cert.created_at;
-      // Ajustar la fecha para evitar problemas de zona horaria (las fechas vienen en UTC o string YYYY-MM-DD)
-      // Si es solo fecha YYYY-MM-DD, añadir T12:00:00 para asegurar el mismo día
-      const adjustDate = (dateStr) => {
-        if (!dateStr) return null;
-        if (dateStr.includes('T')) return new Date(dateStr);
-        return new Date(dateStr + 'T12:00:00');
-      };
-
-      const createdDateObj = adjustDate(emissionDateSource);
-      const createdDate = createdDateObj ? createdDateObj.toLocaleDateString('es-ES') : 'N/A';
-      
-      const validityStartObj = adjustDate(cert.validity_start);
-      const validityStart = validityStartObj ? validityStartObj.toLocaleDateString('es-ES') : null;
-      
-      const validityEndObj = adjustDate(cert.validity_end);
-      const validityEnd = validityEndObj ? validityEndObj.toLocaleDateString('es-ES') : null;
-
-      // Mapeo de tipos de cita
-      const appointmentTypeMap = {
-        'examen_periodico': 'Examen Médico Periódico',
-        'examen_ingreso': 'Examen de Ingreso',
-        'examen_egreso': 'Examen de Egreso',
-        'examen_reintegro': 'Examen de Reintegro',
-        'consulta_general': 'Consulta General',
-        'consulta_especializada': 'Consulta Especializada',
-        'seguimiento': 'Seguimiento',
-        'urgencias': 'Urgencias'
-      };
-      const appointmentTypeText = cert.appointment_type ? (appointmentTypeMap[cert.appointment_type] || cert.appointment_type) : null;
 
       statusInfo.innerHTML = `
         <div class="mb-4">
@@ -426,21 +461,29 @@ import Layout from "../../layouts/Layout.astro";
           
           showLoading(false);
           
-          Swal.fire({
-            icon: 'success',
-            title: 'Descarga exitosa',
-            text: 'El certificado se ha descargado correctamente',
-            timer: 2000,
-            showConfirmButton: false
-          });
+          if (typeof Swal !== 'undefined') {
+            Swal.fire({
+              icon: 'success',
+              title: 'Descarga exitosa',
+              text: 'El certificado se ha descargado correctamente',
+              timer: 2000,
+              showConfirmButton: false
+            });
+          } else {
+            alert('El certificado se ha descargado correctamente');
+          }
         } catch (error) {
           showLoading(false);
-          Swal.fire({
-            icon: 'error',
-            title: 'Error de descarga',
-            text: 'No se pudo descargar el certificado. Intenta nuevamente.',
-            confirmButtonText: 'Entendido'
-          });
+          if (typeof Swal !== 'undefined') {
+            Swal.fire({
+              icon: 'error',
+              title: 'Error de descarga',
+              text: 'No se pudo descargar el certificado. Intenta nuevamente.',
+              confirmButtonText: 'Entendido'
+            });
+          } else {
+            alert('No se pudo descargar el certificado. Intenta nuevamente.');
+          }
         }
       };
 
@@ -453,24 +496,62 @@ import Layout from "../../layouts/Layout.astro";
       }, 100);
 
       // Mostrar mensaje de éxito
-      Swal.fire({
-        icon: 'success',
-        title: 'Certificado verificado',
-        text: 'El certificado es válido y auténtico',
-        timer: 2000,
-        showConfirmButton: false
-      });
+      if (typeof Swal !== 'undefined') {
+        Swal.fire({
+          icon: 'success',
+          title: 'Certificado verificado',
+          text: 'El certificado es válido y auténtico',
+          timer: 2000,
+          showConfirmButton: false
+        });
+      }
     }
 
-    function showError(message) {
-      document.getElementById('result').classList.add('hidden');
+    function showError(message, technicalDetails = null) {
+      document.getElementById('result').classList.remove('hidden');
       
-      Swal.fire({
-        icon: 'error',
-        title: 'Verificación fallida',
-        text: message,
-        confirmButtonText: 'Entendido'
-      });
+      const statusBanner = document.getElementById('statusBanner');
+      const statusIcon = document.getElementById('statusIcon');
+      const statusTitle = document.getElementById('statusTitle');
+      const statusSubtitle = document.getElementById('statusSubtitle');
+      
+      statusBanner.className = 'rounded-xl border p-6 mb-6 shadow-lg bg-red-50 border-red-200';
+      statusIcon.className = 'flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl bg-red-600';
+      statusIcon.textContent = '✗';
+      statusTitle.textContent = 'Certificado No Válido';
+      statusTitle.className = 'font-bold text-xl mb-1 text-red-800';
+      statusSubtitle.textContent = message;
+      statusSubtitle.className = 'text-sm text-red-700';
+
+      // Limpiar información previa
+      document.getElementById('patientInfo').innerHTML = '';
+      document.getElementById('statusInfo').innerHTML = '';
+      document.getElementById('restrictionsSection').classList.add('hidden');
+      
+      // Scroll a resultados
+      setTimeout(() => {
+        document.getElementById('result').scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 100);
+
+      // Intentar mostrar SweetAlert si está disponible
+      if (typeof Swal !== 'undefined') {
+        const swalConfig = {
+          icon: 'error',
+          title: 'Error de verificación',
+          text: message,
+          confirmButtonText: 'Intentar nuevamente',
+          confirmButtonColor: '#2563EB'
+        };
+
+        if (technicalDetails) {
+          swalConfig.footer = `<details class="text-left text-xs text-gray-500 mt-2"><summary>Detalles técnicos</summary><pre class="mt-2 p-2 bg-gray-100 rounded overflow-x-auto">${technicalDetails}</pre></details>`;
+        }
+
+        Swal.fire(swalConfig);
+      }
     }
 
     function showLoading(show) {
@@ -525,20 +606,28 @@ import Layout from "../../layouts/Layout.astro";
     async function copyToClipboard(text) {
       try {
         await navigator.clipboard.writeText(text);
-        Swal.fire({
-          icon: 'success',
-          title: 'Enlace copiado',
-          text: 'El enlace se ha copiado al portapapeles',
-          timer: 2000,
-          showConfirmButton: false
-        });
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            icon: 'success',
+            title: 'Enlace copiado',
+            text: 'El enlace se ha copiado al portapapeles',
+            timer: 2000,
+            showConfirmButton: false
+          });
+        } else {
+          alert('Enlace copiado al portapapeles');
+        }
       } catch (error) {
-        Swal.fire({
-          icon: 'info',
-          title: 'Enlace disponible',
-          text: text,
-          confirmButtonText: 'Cerrar'
-        });
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            icon: 'info',
+            title: 'Enlace disponible',
+            text: text,
+            confirmButtonText: 'Cerrar'
+          });
+        } else {
+          prompt('Copie el enlace manualmente:', text);
+        }
       }
     }
 
